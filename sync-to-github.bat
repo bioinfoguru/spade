@@ -48,7 +48,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-set "GIT_SSH_COMMAND=C:\Windows\System32\OpenSSH\ssh.exe -i "%SSH_KEY%" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+set "GIT_SSH_COMMAND=/c/Windows/System32/OpenSSH/ssh.exe -i "%SSH_KEY%" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
 
 echo Staging project changes...
 git add -A
