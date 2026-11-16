@@ -75,6 +75,29 @@ jobs:
           # Manual runs build workflow artifacts only; v-prefixed tags publish releases.
           tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
           releaseName: ${{ startsWith(github.ref, 'refs/tags/v') && format('SPADE {0}', github.ref_name) || '' }}
-          releaseBody: 'Download the installer for your operating system from the assets below.'
+          releaseBody: |
+            ## Downloads
+
+            **Windows (64-bit)**
+            - `spade.exe` — standalone application executable; no installer.
+            - `*-setup.exe` — recommended Windows installer.
+            - `*.msi` — Windows Installer package for managed deployments.
+
+            **macOS**
+            - `*.dmg` — disk image installer. Choose the asset matching your Mac's processor architecture.
+            - `*.app.tar.gz` — compressed application bundle.
+
+            **Linux**
+            - `*.AppImage` — portable application for most desktop distributions.
+            - `*.deb` — Debian, Ubuntu, and other Debian-based distributions.
+            - `*.rpm` — Fedora, RHEL, openSUSE, and other RPM-based distributions.
+
+            `latest.json` is release metadata and is not an installer.
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+      - name: Upload standalone Windows executable to release
+        if: startsWith(github.ref, 'refs/tags/v') && runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$env:GITHUB_REF_NAME" "src-tauri/target/release/spade.exe" --clobber
