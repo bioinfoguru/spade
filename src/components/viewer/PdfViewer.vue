@@ -15,7 +15,7 @@
       </div>
       <h2 class="text-lg font-bold text-foreground mb-1">Open a PDF to Start</h2>
       <p class="text-xs text-muted-foreground mb-6">
-        View, annotate, edit text, organize pages, and truly redact sensitive documents.
+        View, annotate, edit text, and organize pages.
       </p>
       <button
         @click="$emit('open-file')"
@@ -29,27 +29,25 @@
     <!-- Virtualized Page Stream -->
     <template v-else>
       <div
-        v-for="pageIndex in opStore.pageOrder"
-        :key="pageIndex"
-        :id="`pdf-page-container-${pageIndex}`"
+        v-for="(page, position) in opStore.pages"
+        :key="page.id"
+        :id="`pdf-page-container-${page.id}`"
         class="relative flex flex-col items-center"
       >
         <!-- Mounted Page within Virtualization Window -->
         <PdfPage
-          v-if="isPageInVirtualWindow(pageIndex)"
-          :page-index="pageIndex"
+          v-if="isPageInVirtualWindow(position)"
+          :page-id="page.id"
+          :page-index="page.sourceIndex"
         />
 
         <!-- Lightweight Placeholder for Offscreen Pages -->
         <div
           v-else
           class="bg-card/40 border border-border/40 rounded-xs flex items-center justify-center text-muted-foreground text-xs font-mono shadow-xs"
-          :style="{
-            width: `${placeholderWidth}px`,
-            height: `${placeholderHeight}px`,
-          }"
+          :style="placeholderStyle(page)"
         >
-          Page {{ pageIndex + 1 }}
+          Page {{ position + 1 }}
         </div>
       </div>
     </template>
@@ -57,8 +55,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
-import { FileUp, FolderOpen } from 'lucide-vue-next';
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { FileUp, FolderOpen } from '@lucide/vue';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useViewerStore } from '@/stores/viewerStore';
 import { useOperationStore } from '@/stores/operationStore';
@@ -69,21 +67,70 @@ const viewerStore = useViewerStore();
 const opStore = useOperationStore();
 
 const scrollContainerRef = ref<HTMLDivElement | null>(null);
+let isProgrammaticScroll = false;
+let scrollTimeout: any = null;
 
 defineEmits<{
   (e: 'open-file'): void;
 }>();
 
-// Estimated placeholder dimensions based on standard US Letter (612x792 pt)
-const placeholderWidth = computed(() => Math.floor(612 * viewerStore.scale));
-const placeholderHeight = computed(() => Math.floor(792 * viewerStore.scale));
+// Estimated placeholder dimensions based on real page size, rotation, and crop
+function placeholderStyle(page: { id: string; sourceIndex: number }) {
+  const size = opStore.pageSizes[page.sourceIndex] || { width: 612, height: 792 };
+  const crop = opStore.pageCrops[page.id];
+  let width = crop ? crop.width : size.width;
+  let height = crop ? crop.height : size.height;
 
-// Virtualization sliding window: visible page +/- 1 lookahead page
-function isPageInVirtualWindow(pageIndex: number): boolean {
-  const currentZeroBased = viewerStore.currentPage - 1;
-  const buffer = 1; // 1 lookahead page before and after
-  return pageIndex >= currentZeroBased - buffer && pageIndex <= currentZeroBased + buffer;
+  const rotation =
+    ((opStore.pageNativeRotations[page.sourceIndex] || 0) +
+      (opStore.pageRotations[page.id] || 0) +
+      viewerStore.globalRotation) %
+    360;
+  if (rotation === 90 || rotation === 270) {
+    [width, height] = [height, width];
+  }
+
+  return {
+    width: `${Math.floor(width * viewerStore.scale)}px`,
+    height: `${Math.floor(height * viewerStore.scale)}px`,
+  };
 }
+
+// Virtualization sliding window: visible page +/- 2 lookahead pages
+function isPageInVirtualWindow(position: number): boolean {
+  const currentZeroBased = viewerStore.currentPage - 1;
+  const buffer = 2; // 2 lookahead pages before and after
+  return Math.abs(position - currentZeroBased) <= buffer;
+}
+
+// Programmatic scroll to target page (e.g. from sidebar or status bar)
+function scrollToPage(pageNumber: number) {
+  const page = opStore.pages[pageNumber - 1];
+  if (!page) return;
+
+  nextTick(() => {
+    const el = document.getElementById(`pdf-page-container-${page.id}`);
+    if (el && scrollContainerRef.value) {
+      isProgrammaticScroll = true;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        isProgrammaticScroll = false;
+      }, 700);
+    }
+  });
+}
+
+// Watch for external page changes (sidebar click, jump input)
+watch(
+  () => viewerStore.currentPage,
+  (newPage) => {
+    // A new page request always wins, even if a previous smooth scroll is still running.
+    clearTimeout(scrollTimeout);
+    isProgrammaticScroll = false;
+    scrollToPage(newPage);
+  }
+);
 
 // Mouse Wheel Zoom (Ctrl/Cmd + Wheel)
 function onWheel(e: WheelEvent) {
@@ -97,48 +144,116 @@ function onWheel(e: WheelEvent) {
   }
 }
 
+// Zoom stuck while resizing pages, so a scroll event is not mistaken for a page change.
+watch(
+  () => viewerStore.scale,
+  () => {
+    isProgrammaticScroll = true;
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      isProgrammaticScroll = false;
+    }, 300);
+  }
+);
+
 // Detect visible page on scroll
 function onScroll() {
-  if (!scrollContainerRef.value || opStore.pageOrder.length === 0) return;
+  if (isProgrammaticScroll || !scrollContainerRef.value || opStore.pages.length === 0) return;
   const container = scrollContainerRef.value;
-  const containerCenter = container.scrollTop + container.clientHeight / 2;
+  const containerTop = container.getBoundingClientRect().top;
+  const containerCenter = container.scrollTop + container.clientHeight / 3;
 
-  let closestPageIndex = viewerStore.currentPage - 1;
+  let closestPagePosition = viewerStore.currentPage - 1;
   let minDistance = Infinity;
 
-  for (const pageIdx of opStore.pageOrder) {
-    const el = document.getElementById(`pdf-page-container-${pageIdx}`);
+  opStore.pages.forEach((page, position) => {
+    const el = document.getElementById(`pdf-page-container-${page.id}`);
     if (el) {
-      const elCenter = el.offsetTop + el.clientHeight / 2;
-      const distance = Math.abs(containerCenter - elCenter);
+      const elTop = el.getBoundingClientRect().top - containerTop + container.scrollTop;
+      const distance = Math.abs(containerCenter - elTop);
       if (distance < minDistance) {
         minDistance = distance;
-        closestPageIndex = pageIdx;
+        closestPagePosition = position;
       }
     }
-  }
+  });
 
-  viewerStore.currentPage = closestPageIndex + 1;
+  const detectedPage = closestPagePosition + 1;
+  if (viewerStore.currentPage !== detectedPage) {
+    viewerStore.currentPage = detectedPage;
+  }
 }
 
-// ResizeObserver for dynamic Fit Width and Fit Page
+// Resolve the displayed size (in PDF points) of the current page.
+const currentPageRef = computed(() => opStore.pages[viewerStore.currentPage - 1]);
+const currentSourceSize = computed(() =>
+  currentPageRef.value ? opStore.pageSizes[currentPageRef.value.sourceIndex] : undefined
+);
+
+function currentDisplayPageSize() {
+  const page = currentPageRef.value;
+  const size = currentSourceSize.value || { width: 612, height: 792 };
+  const crop = page ? opStore.pageCrops[page.id] : null;
+  let width = crop ? crop.width : size.width;
+  let height = crop ? crop.height : size.height;
+
+  const rotation =
+    ((page ? opStore.pageNativeRotations[page.sourceIndex] || 0 : 0) +
+      (page ? opStore.pageRotations[page.id] || 0 : 0) +
+      viewerStore.globalRotation) %
+    360;
+  if (rotation === 90 || rotation === 270) {
+    [width, height] = [height, width];
+  }
+  return { width, height };
+}
+
+function applyFitMode() {
+  const el = scrollContainerRef.value;
+  if (!el || !docStore.currentDoc || viewerStore.fitMode === 'custom') return;
+
+  const { width, height } = currentDisplayPageSize();
+  const availableWidth = Math.max(120, el.clientWidth - 48);
+  const availableHeight = Math.max(120, el.clientHeight - 48);
+
+  let nextScale = viewerStore.scale;
+  if (viewerStore.fitMode === 'actual') {
+    nextScale = 1;
+  } else if (viewerStore.fitMode === 'fit-width') {
+    nextScale = availableWidth / width;
+  } else if (viewerStore.fitMode === 'fit-page') {
+    nextScale = Math.min(availableWidth / width, availableHeight / height);
+  }
+
+  viewerStore.scale = Math.max(0.2, Math.min(5, nextScale));
+}
+
+watch(
+  [
+    () => viewerStore.fitMode,
+    () => viewerStore.globalRotation,
+    () => viewerStore.currentPage,
+    currentPageRef,
+    currentSourceSize,
+  ],
+  () => {
+    nextTick(applyFitMode);
+  },
+  { deep: true }
+);
+
+// ResizeObserver keeps fit modes accurate when the window/sidebars change size.
 let resizeObserver: ResizeObserver | null = null;
 
 onMounted(() => {
   if (!scrollContainerRef.value) return;
 
-  resizeObserver = new ResizeObserver((entries) => {
-    for (const entry of entries) {
-      const containerWidth = entry.contentRect.width;
-      if (viewerStore.fitMode === 'fit-width' && containerWidth > 100) {
-        // Fit width: standard page width ~612pt with 48px padding
-        const targetScale = (containerWidth - 64) / 612;
-        viewerStore.scale = Math.max(0.3, Math.min(3.0, targetScale));
-      }
-    }
+  resizeObserver = new ResizeObserver(() => {
+    applyFitMode();
   });
 
   resizeObserver.observe(scrollContainerRef.value);
+  nextTick(applyFitMode);
 });
 
 onBeforeUnmount(() => {
@@ -147,3 +262,4 @@ onBeforeUnmount(() => {
   }
 });
 </script>
+

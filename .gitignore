@@ -4,3 +4,13 @@ src-tauri/target/
 .DS_Store
 Thumbs.db
 *.log
+
+plan.md
+progress.md
+logo_path_square.svg
+
+# Local GitHub SSH credentials (never commit private keys)
+spade_github_sync
+spade_github_sync.pub
+spade_github_ed25519
+spade_github_ed25519.pub

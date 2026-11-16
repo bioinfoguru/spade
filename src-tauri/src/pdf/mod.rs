@@ -11,3 +11,4 @@ pub trait PdfEngine: Send + Sync {
     fn apply_operation(&mut self, operation: &DocumentOperation) -> Result<OperationResult, PdfError>;
     fn validate(&self) -> Result<bool, PdfError>;
 }
+

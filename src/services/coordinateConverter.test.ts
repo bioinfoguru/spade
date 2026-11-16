@@ -51,3 +51,4 @@ export function runCoordinateTests() {
 
   console.log('All CoordinateConverter tests passed successfully!');
 }
+

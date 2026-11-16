@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { DocumentOperation } from '@/types/operations';
 import { useOperationStore } from './operationStore';
 import { useDocumentStore } from './documentStore';
+import { useViewerStore } from './viewerStore';
 
 export const useHistoryStore = defineStore('history', () => {
   const undoStack = ref<DocumentOperation[]>([]);
@@ -16,6 +17,16 @@ export const useHistoryStore = defineStore('history', () => {
     const lastOp = undoStack.value[undoStack.value.length - 1];
     return formatOpName(lastOp.type);
   });
+
+  // Keep the viewer's page count in sync after page-level operations
+  function syncPageCount() {
+    const opStore = useOperationStore();
+    const viewerStore = useViewerStore();
+    viewerStore.totalPages = Math.max(1, opStore.pages.length);
+    if (viewerStore.currentPage > viewerStore.totalPages) {
+      viewerStore.setPage(viewerStore.totalPages);
+    }
+  }
 
   function formatOpName(type: string): string {
     return type
@@ -35,6 +46,7 @@ export const useHistoryStore = defineStore('history', () => {
     }
     redoStack.value = []; // Clear redo stack on new operation
     docStore.markDirty(true);
+    syncPageCount();
   }
 
   function undo() {
@@ -47,6 +59,7 @@ export const useHistoryStore = defineStore('history', () => {
     revertOperation(op, opStore);
     redoStack.value.push(op);
     docStore.markDirty(true);
+    syncPageCount();
   }
 
   function redo() {
@@ -58,6 +71,7 @@ export const useHistoryStore = defineStore('history', () => {
     opStore.applyOperation(op);
     undoStack.value.push(op);
     docStore.markDirty(true);
+    syncPageCount();
   }
 
   function revertOperation(op: DocumentOperation, opStore: ReturnType<typeof useOperationStore>) {
@@ -70,6 +84,21 @@ export const useHistoryStore = defineStore('history', () => {
           opStore.annotations.push(op.inversePayload.annotation);
         }
         break;
+      case 'transform_annotation': {
+        const item = opStore.annotations.find((a) => a.id === op.inversePayload.annotationId);
+        if (item) {
+          if (op.inversePayload.updates.rect) {
+            item.rect = op.inversePayload.updates.rect;
+          }
+          if (item.type === 'ink' && op.inversePayload.updates.paths) {
+            item.paths = op.inversePayload.updates.paths;
+          }
+          if (op.inversePayload.updates.contents !== undefined) {
+            item.contents = op.inversePayload.updates.contents;
+          }
+        }
+        break;
+      }
       case 'insert_text_box':
         opStore.textObjects = opStore.textObjects.filter((t) => t.id !== op.payload.textObject.id);
         break;
@@ -93,14 +122,41 @@ export const useHistoryStore = defineStore('history', () => {
           opStore.imageObjects.push(op.inversePayload.imageObject);
         }
         break;
+      case 'transform_image': {
+        const item = opStore.imageObjects.find((i) => i.id === op.inversePayload.imageObjectId);
+        if (item) {
+          item.rect = op.inversePayload.updates.rect;
+        }
+        break;
+      }
       case 'reorder_pages': {
-        const [moved] = opStore.pageOrder.splice(op.payload.toIndex, 1);
-        opStore.pageOrder.splice(op.payload.fromIndex, 0, moved);
+        const [moved] = opStore.pages.splice(op.payload.toIndex, 1);
+        if (moved) {
+          opStore.pages.splice(op.payload.fromIndex, 0, moved);
+        }
+        break;
+      }
+      case 'duplicate_page': {
+        opStore.pages = opStore.pages.filter((p) => p.id !== op.inversePayload.pageId);
+        delete opStore.pageRotations[op.inversePayload.pageId];
+        delete opStore.pageCrops[op.inversePayload.pageId];
         break;
       }
       case 'rotate_page': {
-        const current = opStore.pageRotations[op.payload.pageIndex] || 0;
-        opStore.pageRotations[op.payload.pageIndex] = (current - op.payload.angleDegrees + 360) % 360;
+        const current = opStore.pageRotations[op.payload.pageId] || 0;
+        opStore.pageRotations[op.payload.pageId] = (current - op.payload.angleDegrees + 360) % 360;
+        break;
+      }
+      case 'delete_page': {
+        opStore.pages.splice(op.inversePayload.index, 0, op.inversePayload.page);
+        break;
+      }
+      case 'crop_page': {
+        if (op.inversePayload.crop) {
+          opStore.pageCrops[op.inversePayload.pageId] = op.inversePayload.crop;
+        } else {
+          delete opStore.pageCrops[op.inversePayload.pageId];
+        }
         break;
       }
     }
@@ -123,3 +179,4 @@ export const useHistoryStore = defineStore('history', () => {
     clearHistory,
   };
 });
+

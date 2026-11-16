@@ -32,3 +32,15 @@ export interface PdfDocumentInfo {
   isDirty: boolean;
   lastSavedAt: number;
 }
+
+/**
+ * A page instance in the working document.
+ *
+ * `id` stays stable for the lifetime of the page (including reorder/duplicate),
+ * while `sourceIndex` points at the original PDF page used for rendering.
+ */
+export interface PageRef {
+  id: string;
+  sourceIndex: number;
+}
+

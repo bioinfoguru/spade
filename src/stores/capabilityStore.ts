@@ -10,7 +10,7 @@ export const useCapabilityStore = defineStore('capability', () => {
     canInsertText: true,
     canInsertImages: true,
     canEditForms: true,
-    canApplyRedactions: true,
+    canApplyRedactions: false,
     canEncrypt: true,
     hasExistingSignatures: false,
     certificationLevel: 'None',
@@ -44,3 +44,4 @@ export const useCapabilityStore = defineStore('capability', () => {
     setCompatibility,
   };
 });
+

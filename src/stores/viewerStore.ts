@@ -70,3 +70,4 @@ export const useViewerStore = defineStore('viewer', () => {
     rotateCounterClockwise,
   };
 });
+

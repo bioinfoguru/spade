@@ -3,10 +3,8 @@
     <!-- Left Section: Logo & App Title & Document Tabs -->
     <div class="flex items-center space-x-3 overflow-hidden">
       <div class="flex items-center space-x-2 text-primary font-bold text-sm tracking-wide">
-        <div class="w-6 h-6 rounded bg-primary text-primary-foreground flex items-center justify-center font-black text-xs shadow-sm">
-          P
-        </div>
-        <span class="hidden md:inline font-semibold text-foreground">PDF Studio Pro</span>
+        <img src="/logo.svg" class="w-6 h-6 rounded object-contain" alt="SPADE Logo" />
+        <span class="hidden md:inline font-semibold text-foreground">SPADE</span>
       </div>
 
       <!-- Vertical divider -->
@@ -79,12 +77,29 @@
       </button>
 
       <button
+        @click="$emit('merge-files')"
+        class="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-secondary hover:bg-muted border border-border text-xs font-medium text-foreground transition-colors"
+      >
+        <Combine class="w-3.5 h-3.5" />
+        <span>Merge</span>
+      </button>
+
+      <button
         @click="$emit('save-file')"
         :disabled="!docStore.currentDoc"
         class="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 text-xs font-medium transition-colors shadow-sm"
       >
         <Save class="w-3.5 h-3.5" />
         <span>Save</span>
+      </button>
+
+      <button
+        @click="$emit('show-help')"
+        class="flex items-center space-x-1.5 px-2 py-1 rounded text-xs font-medium text-foreground hover:bg-muted transition-colors"
+        title="Help and keyboard shortcuts"
+      >
+        <CircleHelp class="w-3.5 h-3.5" />
+        <span>Help</span>
       </button>
 
       <!-- Theme Switcher -->
@@ -104,6 +119,7 @@
 import {
   FileText,
   FolderOpen,
+  Combine,
   Save,
   Undo2,
   Redo2,
@@ -111,7 +127,8 @@ import {
   Moon,
   X,
   ShieldCheck,
-} from 'lucide-vue-next';
+  CircleHelp,
+} from '@lucide/vue';
 import { useAppStore } from '@/stores/appStore';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useHistoryStore } from '@/stores/historyStore';
@@ -124,6 +141,9 @@ const capStore = useCapabilityStore();
 
 defineEmits<{
   (e: 'open-file'): void;
+  (e: 'merge-files'): void;
   (e: 'save-file'): void;
+  (e: 'show-help'): void;
 }>();
 </script>
+

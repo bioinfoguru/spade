@@ -50,3 +50,4 @@ export const useDocumentStore = defineStore('document', () => {
     closeDocument,
   };
 });
+

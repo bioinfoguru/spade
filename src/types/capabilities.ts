@@ -29,3 +29,4 @@ export interface PdfCompatibilityReport {
   safeToModify: boolean;
   warnings: string[];
 }
+

@@ -106,7 +106,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight } from '@lucide/vue';
 import { useViewerStore, FitMode } from '@/stores/viewerStore';
 import { useDocumentStore } from '@/stores/documentStore';
 
@@ -120,9 +120,6 @@ const pageInput = computed({
 
 function setFitMode(mode: FitMode) {
   viewerStore.fitMode = mode;
-  if (mode === 'actual') {
-    viewerStore.setScale(1.0);
-  }
 }
 
 function onSliderZoom(e: Event) {
@@ -130,3 +127,4 @@ function onSliderZoom(e: Event) {
   viewerStore.setScale(parseFloat(target.value));
 }
 </script>
+

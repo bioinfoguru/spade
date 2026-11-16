@@ -63,3 +63,4 @@ pub async fn merge_pdfs_cmd(
     .await
     .map_err(|e| e.to_string())?
 }
+

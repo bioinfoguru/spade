@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for PDF Studio Pro",
+  "description": "Default capabilities for SPADE",
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-destroy",
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
@@ -14,3 +15,4 @@
     "fs:allow-exists"
   ]
 }
+

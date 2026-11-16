@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "PDF Studio Pro",
+  "productName": "SPADE",
   "version": "0.1.0",
   "identifier": "com.pdfstudio.pro",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "PDF Studio Pro",
+        "title": "SPADE",
         "width": 1400,
         "height": 900,
         "minWidth": 960,
@@ -29,5 +29,15 @@
   "plugins": {
     "dialog": null,
     "fs": null
+  },
+  "bundle": {
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   }
 }
+

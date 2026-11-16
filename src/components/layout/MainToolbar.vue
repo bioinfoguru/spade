@@ -42,7 +42,7 @@
               ? 'bg-primary text-primary-foreground shadow-sm'
               : 'text-foreground hover:bg-muted'
           ]"
-          title="Highlight Text"
+          title="Highlight Text (Drag to highlight)"
         >
           <Highlighter class="w-3.5 h-3.5 text-amber-500" />
           <span class="hidden lg:inline">Highlight</span>
@@ -117,79 +117,67 @@
           <ImageIcon class="w-3.5 h-3.5" />
           <span>Image</span>
         </button>
-
-        <button
-          @click="appStore.setTool('signature')"
-          :class="[
-            'flex items-center space-x-1 px-2 py-1 rounded transition-colors',
-            appStore.activeTool === 'signature'
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-foreground hover:bg-muted'
-          ]"
-          title="Sign Document"
-        >
-          <FileSignature class="w-3.5 h-3.5 text-emerald-500" />
-          <span>Sign</span>
-        </button>
       </div>
 
       <div class="h-4 w-px bg-border/60 mx-1"></div>
 
-      <!-- True Redaction Tool -->
-      <button
-        @click="appStore.setTool('redact')"
-        :class="[
-          'flex items-center space-x-1 px-2 py-1 rounded transition-colors',
-          appStore.activeTool === 'redact'
-            ? 'bg-destructive text-destructive-foreground shadow-sm'
-            : 'text-destructive hover:bg-destructive/10'
-        ]"
-        title="Mark for True Redaction"
-      >
-        <ShieldAlert class="w-3.5 h-3.5" />
-        <span>Redact</span>
-      </button>
+      <!-- Page Organize Group (Delete, Duplicate, Rotate) -->
+      <div class="flex items-center space-x-0.5 bg-secondary/30 p-0.5 rounded border border-border/40">
+        <button
+          @click="rotateCurrentPage(-90)"
+          :disabled="!docStore.currentDoc"
+          class="p-1 rounded text-foreground hover:bg-muted disabled:opacity-30 transition-colors"
+          title="Rotate Current Page CCW (-90°)"
+        >
+          <RotateCcw class="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          @click="rotateCurrentPage(90)"
+          :disabled="!docStore.currentDoc"
+          class="p-1 rounded text-foreground hover:bg-muted disabled:opacity-30 transition-colors"
+          title="Rotate Current Page CW (+90°)"
+        >
+          <RotateCw class="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          @click="duplicateCurrentPage"
+          :disabled="!docStore.currentDoc"
+          class="p-1 rounded text-foreground hover:bg-muted disabled:opacity-30 transition-colors"
+          title="Duplicate Current Page"
+        >
+          <Copy class="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          @click="toggleCropCurrentPage"
+          :disabled="!docStore.currentDoc"
+          :class="[
+            'p-1 rounded transition-colors disabled:opacity-30',
+            appStore.activeTool === 'crop'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-foreground hover:bg-muted'
+          ]"
+          title="Crop Current Page"
+        >
+          <Crop class="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          @click="deleteCurrentPage"
+          :disabled="!docStore.currentDoc || opStore.pages.length <= 1"
+          class="p-1 rounded text-destructive hover:bg-destructive/10 disabled:opacity-30 transition-colors"
+          title="Delete Current Page"
+        >
+          <Trash2 class="w-3.5 h-3.5" />
+        </button>
+      </div>
+
     </div>
 
-    <!-- Right Section: Page Manipulation & Zoom Controls -->
+    <!-- Right Section: Panel Toggle -->
     <div class="flex items-center space-x-1">
-      <!-- Rotate Controls -->
-      <button
-        @click="viewerStore.rotateCounterClockwise()"
-        class="p-1.5 rounded text-foreground hover:bg-muted transition-colors"
-        title="Rotate Counter-Clockwise"
-      >
-        <RotateCcw class="w-3.5 h-3.5" />
-      </button>
-      <button
-        @click="viewerStore.rotateClockwise()"
-        class="p-1.5 rounded text-foreground hover:bg-muted transition-colors"
-        title="Rotate Clockwise"
-      >
-        <RotateCw class="w-3.5 h-3.5" />
-      </button>
-
-      <div class="h-4 w-px bg-border/60 mx-1"></div>
-
-      <!-- Zoom Controls -->
-      <button
-        @click="viewerStore.zoomOut()"
-        class="p-1.5 rounded text-foreground hover:bg-muted transition-colors"
-        title="Zoom Out (Ctrl+-)"
-      >
-        <ZoomOut class="w-3.5 h-3.5" />
-      </button>
-      <span class="w-12 text-center font-mono font-medium text-foreground">
-        {{ viewerStore.zoomPercent }}%
-      </span>
-      <button
-        @click="viewerStore.zoomIn()"
-        class="p-1.5 rounded text-foreground hover:bg-muted transition-colors"
-        title="Zoom In (Ctrl++)"
-      >
-        <ZoomIn class="w-3.5 h-3.5" />
-      </button>
-
       <button
         @click="toggleRightPanel"
         :class="[
@@ -214,19 +202,25 @@ import {
   StickyNote,
   Type,
   Image as ImageIcon,
-  FileSignature,
-  ShieldAlert,
   RotateCw,
   RotateCcw,
-  ZoomIn,
-  ZoomOut,
+  Copy,
+  Crop,
+  Trash2,
   SlidersHorizontal,
-} from 'lucide-vue-next';
+} from '@lucide/vue';
+import { confirm as tauriConfirm } from '@tauri-apps/plugin-dialog';
 import { useAppStore } from '@/stores/appStore';
 import { useViewerStore } from '@/stores/viewerStore';
+import { useDocumentStore } from '@/stores/documentStore';
+import { useOperationStore } from '@/stores/operationStore';
+import { useHistoryStore } from '@/stores/historyStore';
 
 const appStore = useAppStore();
 const viewerStore = useViewerStore();
+const docStore = useDocumentStore();
+const opStore = useOperationStore();
+const historyStore = useHistoryStore();
 
 defineEmits<{
   (e: 'add-image'): void;
@@ -234,5 +228,77 @@ defineEmits<{
 
 function toggleRightPanel() {
   appStore.rightSidebarOpen = !appStore.rightSidebarOpen;
+}
+
+// Current page index (0-based)
+function getCurrentPageIndex(): number {
+  return viewerStore.currentPage - 1;
+}
+
+function rotateCurrentPage(angle: 90 | -90) {
+  const page = opStore.pages[getCurrentPageIndex()];
+  if (!page) return;
+
+  historyStore.pushOperation({
+    id: `op-${Date.now()}`,
+    type: 'rotate_page',
+    documentId: 'doc',
+    documentRevision: opStore.currentRevision + 1,
+    payload: { pageId: page.id, angleDegrees: angle },
+    inversePayload: { pageId: page.id, angleDegrees: (-angle as 90 | -90 | 180) },
+    timestamp: Date.now(),
+  });
+}
+
+async function deleteCurrentPage() {
+  if (opStore.pages.length <= 1) return;
+  const pageIdx = getCurrentPageIndex();
+  const page = opStore.pages[pageIdx];
+  if (!page) return;
+
+  const confirmed = await tauriConfirm(
+    `Delete Page ${pageIdx + 1}? You can undo this action.`,
+    { title: 'Confirm Delete', kind: 'warning' }
+  );
+  if (!confirmed) return;
+
+  historyStore.pushOperation({
+    id: `op-${Date.now()}`,
+    type: 'delete_page',
+    documentId: 'doc',
+    documentRevision: opStore.currentRevision + 1,
+    payload: { pageId: page.id },
+    inversePayload: { page, index: pageIdx },
+    timestamp: Date.now(),
+  });
+
+  viewerStore.totalPages = opStore.pages.length;
+  if (viewerStore.currentPage > opStore.pages.length) {
+    viewerStore.setPage(opStore.pages.length);
+  }
+}
+
+function duplicateCurrentPage() {
+  const pageIdx = getCurrentPageIndex();
+  const page = opStore.pages[pageIdx];
+  if (!page) return;
+
+  const clone = opStore.createPageRef(page.sourceIndex);
+  historyStore.pushOperation({
+    id: `op-${Date.now()}`,
+    type: 'duplicate_page',
+    documentId: 'doc',
+    documentRevision: opStore.currentRevision + 1,
+    payload: { page: clone, insertIndex: pageIdx + 1, rotation: opStore.pageRotations[page.id] || 0, crop: opStore.pageCrops[page.id] || null },
+    inversePayload: { pageId: clone.id },
+    timestamp: Date.now(),
+  });
+
+  viewerStore.totalPages = opStore.pages.length;
+}
+
+function toggleCropCurrentPage() {
+  if (!docStore.currentDoc) return;
+  appStore.setTool(appStore.activeTool === 'crop' ? 'select' : 'crop');
 }
 </script>

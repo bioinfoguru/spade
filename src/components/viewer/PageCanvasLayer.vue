@@ -47,6 +47,7 @@ async function renderCanvas() {
     });
 
     const task = props.page.render({
+      canvas,
       canvasContext: ctx,
       viewport,
       intent: 'display',

@@ -84,3 +84,4 @@ impl FeatureDetector {
         Ok((caps, report))
     }
 }
+

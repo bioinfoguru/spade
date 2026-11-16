@@ -39,3 +39,4 @@ impl From<lopdf::Error> for PdfError {
         PdfError::Parse(err.to_string())
     }
 }
+

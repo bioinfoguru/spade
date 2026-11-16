@@ -1,4 +1,5 @@
 import { Rect, Point } from './geometry';
+import { PageRef } from './pdf';
 
 export type AnnotationType = 'highlight' | 'underline' | 'strikeout' | 'ink' | 'square' | 'circle' | 'line' | 'note';
 
@@ -75,6 +76,13 @@ export interface RedactionMark {
   fillColor: string;
 }
 
+/** Geometry updates used when dragging an existing annotation. */
+export interface AnnotationTransform {
+  rect?: Rect;
+  paths?: Point[][];
+  contents?: string;
+}
+
 /* Discriminated Document Operations */
 export type DocumentOperation =
   | {
@@ -93,6 +101,15 @@ export type DocumentOperation =
       documentRevision: number;
       payload: { annotationId: string; pageIndex: number };
       inversePayload: { annotation: AnnotationData };
+      timestamp: number;
+    }
+  | {
+      id: string;
+      type: "transform_annotation";
+      documentId: string;
+      documentRevision: number;
+      payload: { annotationId: string; pageIndex: number; updates: AnnotationTransform };
+      inversePayload: { annotationId: string; pageIndex: number; updates: AnnotationTransform };
       timestamp: number;
     }
   | {
@@ -142,6 +159,15 @@ export type DocumentOperation =
     }
   | {
       id: string;
+      type: "transform_image";
+      documentId: string;
+      documentRevision: number;
+      payload: { imageObjectId: string; pageIndex: number; updates: { rect: Rect } };
+      inversePayload: { imageObjectId: string; pageIndex: number; updates: { rect: Rect } };
+      timestamp: number;
+    }
+  | {
+      id: string;
       type: "reorder_pages";
       documentId: string;
       documentRevision: number;
@@ -151,11 +177,20 @@ export type DocumentOperation =
     }
   | {
       id: string;
+      type: "duplicate_page";
+      documentId: string;
+      documentRevision: number;
+      payload: { page: PageRef; insertIndex: number; rotation: number; crop?: Rect | null };
+      inversePayload: { pageId: string };
+      timestamp: number;
+    }
+  | {
+      id: string;
       type: "rotate_page";
       documentId: string;
       documentRevision: number;
-      payload: { pageIndex: number; angleDegrees: 90 | -90 | 180 };
-      inversePayload: { pageIndex: number; angleDegrees: 90 | -90 | 180 };
+      payload: { pageId: string; angleDegrees: 90 | -90 | 180 };
+      inversePayload: { pageId: string; angleDegrees: 90 | -90 | 180 };
       timestamp: number;
     }
   | {
@@ -163,8 +198,17 @@ export type DocumentOperation =
       type: "delete_page";
       documentId: string;
       documentRevision: number;
-      payload: { pageIndex: number };
-      inversePayload: { pageIndex: number; pageDataUri?: string };
+      payload: { pageId: string };
+      inversePayload: { page: PageRef; index: number };
+      timestamp: number;
+    }
+  | {
+      id: string;
+      type: "crop_page";
+      documentId: string;
+      documentRevision: number;
+      payload: { pageId: string; crop: Rect | null };
+      inversePayload: { pageId: string; crop: Rect | null };
       timestamp: number;
     }
   | {
@@ -185,3 +229,4 @@ export type DocumentOperation =
       inversePayload: { markId: string; pageIndex: number };
       timestamp: number;
     };
+

@@ -1,6 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { PdfMetadata, PdfOutlineItem } from '@/types/pdf';
 
+const PDFJS_CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.5.438';
+
 // Configure the worker URL using Vite's URL import
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -28,9 +30,11 @@ export class PdfService {
       data: typeof source === 'string' ? undefined : source,
       url: typeof source === 'string' ? source : undefined,
       password: password || undefined,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+      cMapUrl: `${PDFJS_CDN}/cmaps/`,
       cMapPacked: true,
-      standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/standard_fonts/',
+      standardFontDataUrl: `${PDFJS_CDN}/standard_fonts/`,
+      wasmUrl: `${PDFJS_CDN}/wasm/`,
+      iccUrl: `${PDFJS_CDN}/iccs/`,
     });
 
     const pdfDocument = await loadingTask.promise;
@@ -114,6 +118,7 @@ export class PdfService {
     if (!ctx) throw new Error('Could not get canvas 2d context');
 
     return page.render({
+      canvas,
       canvasContext: ctx,
       viewport,
       intent: 'display',
@@ -139,6 +144,7 @@ export class PdfService {
     if (!ctx) return '';
 
     await page.render({
+      canvas,
       canvasContext: ctx,
       viewport,
       intent: 'display',
@@ -147,3 +153,4 @@ export class PdfService {
     return canvas.toDataURL('image/jpeg', 0.85);
   }
 }
+

@@ -109,6 +109,19 @@
         </div>
 
         <div v-if="appStore.activeTool === 'shape'">
+          <label class="block text-[11px] text-muted-foreground mb-1">Shape Type</label>
+          <select
+            v-model="appStore.shapeType"
+            title="Shape type"
+            class="w-full bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="square">Rectangle</option>
+            <option value="circle">Circle</option>
+            <option value="line">Line</option>
+          </select>
+        </div>
+
+        <div v-if="appStore.activeTool === 'shape'">
           <label class="block text-[11px] text-muted-foreground mb-1">Fill Color</label>
           <div class="flex items-center space-x-2 bg-background border border-border rounded px-2 py-1">
             <input
@@ -137,10 +150,10 @@
         <div>
           <div class="flex justify-between text-[11px] text-muted-foreground mb-1">
             <span>Opacity</span>
-            <span>{{ Math.round(appStore.opacity * 100) }}%</span>
+            <span>{{ Math.round(activeOpacity * 100) }}%</span>
           </div>
           <input
-            v-model.number="appStore.opacity"
+            v-model.number="activeOpacity"
             type="range"
             min="0.1"
             max="1.0"
@@ -183,10 +196,27 @@
 </template>
 
 <script setup lang="ts">
-import { PanelRightClose } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { PanelRightClose } from '@lucide/vue';
 import { useAppStore } from '@/stores/appStore';
 import { useDocumentStore } from '@/stores/documentStore';
 
 const appStore = useAppStore();
 const docStore = useDocumentStore();
+
+// Highlights have their own opacity so changing them doesn't affect ink/shapes.
+const activeOpacity = computed({
+  get: () =>
+    appStore.activeTool === 'highlight'
+      ? appStore.highlightOpacity
+      : appStore.opacity,
+  set: (value: number) => {
+    if (appStore.activeTool === 'highlight') {
+      appStore.highlightOpacity = value;
+    } else {
+      appStore.opacity = value;
+    }
+  },
+});
 </script>
+
