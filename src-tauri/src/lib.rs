@@ -2,6 +2,7 @@ pub mod commands;
 pub mod models;
 pub mod pdf;
 
+#[cfg(debug_assertions)]
 use tauri::Manager;
 use commands::document::{inspect_document, save_document_atomic};
 use commands::pages::{rotate_page_cmd, delete_page_cmd, merge_pdfs_cmd};
@@ -24,10 +25,10 @@ pub fn run() {
             delete_page_cmd,
             merge_pdfs_cmd
         ])
-        .setup(|app| {
+        .setup(|_app| {
             #[cfg(debug_assertions)]
             {
-                let _window = app.get_webview_window("main").unwrap();
+                let _window = _app.get_webview_window("main").unwrap();
             }
             Ok(())
         })

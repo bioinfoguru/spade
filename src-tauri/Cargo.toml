@@ -1,5 +1,5 @@
 [package]
-name = "desktop-pdf-editor"
+name = "spade"
 version = "0.1.0"
 description = "Professional Desktop PDF Editor"
 authors = ["PDF Studio Team"]

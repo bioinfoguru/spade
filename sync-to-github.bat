@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM Usage: sync-to-github.bat [v0.1.0]
+REM Usage: sync-to-github.bat [v0.1.0] [--move-existing-tag]
 REM Without an argument, this syncs the current branch only.
 REM With a v-prefixed version, it also tags the synced commit and triggers a release build.
 
@@ -14,9 +14,15 @@ if errorlevel 1 (
 set "REPO_URL=git@github.com:bioinfoguru/spade.git"
 set "SSH_KEY=%CD%\spade_github_sync"
 set "RELEASE_TAG=%~1"
+set "MOVE_EXISTING_TAG="
 
-if not "%~2"=="" (
-  echo Usage: sync-to-github.bat [v0.1.0]
+if not "%~2"=="" if /i not "%~2"=="--move-existing-tag" (
+  echo Usage: sync-to-github.bat [v0.1.0] [--move-existing-tag]
+  exit /b 1
+)
+if /i "%~2"=="--move-existing-tag" set "MOVE_EXISTING_TAG=1"
+if defined MOVE_EXISTING_TAG if not defined RELEASE_TAG (
+  echo --move-existing-tag requires a v-prefixed tag argument.
   exit /b 1
 )
 
@@ -90,8 +96,16 @@ if defined RELEASE_TAG (
     for /f "delims=" %%H in ('git rev-parse "%RELEASE_TAG%^{commit}"') do set "TAG_COMMIT=%%H"
     for /f "delims=" %%H in ('git rev-parse HEAD') do set "HEAD_COMMIT=%%H"
     if not "!TAG_COMMIT!"=="!HEAD_COMMIT!" (
-      echo Tag %RELEASE_TAG% already exists on a different commit. Refusing to move it.
-      exit /b 1
+      if not defined MOVE_EXISTING_TAG (
+        echo Tag %RELEASE_TAG% already exists on a different commit. Use --move-existing-tag to replace it.
+        exit /b 1
+      )
+      echo Moving existing tag %RELEASE_TAG% to the current commit...
+      git tag --force "%RELEASE_TAG%" HEAD
+      if errorlevel 1 (
+        echo Could not move tag %RELEASE_TAG%.
+        exit /b 1
+      )
     )
   ) else (
     git tag "%RELEASE_TAG%"
@@ -102,7 +116,11 @@ if defined RELEASE_TAG (
   )
 
   echo Pushing tag %RELEASE_TAG% to start the release build...
-  git push origin "refs/tags/%RELEASE_TAG%"
+  if defined MOVE_EXISTING_TAG (
+    git push --force origin "refs/tags/%RELEASE_TAG%"
+  ) else (
+    git push origin "refs/tags/%RELEASE_TAG%"
+  )
   if errorlevel 1 (
     echo Tag push failed. The local tag remains; fix the issue and rerun with the same tag argument.
     exit /b 1

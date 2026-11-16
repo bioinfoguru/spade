@@ -639,25 +639,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "desktop-pdf-editor"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "image",
- "lopdf",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "thiserror 2.0.21",
- "tokio",
- "uuid",
- "zeroize",
-]
-
-[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3278,6 +3259,25 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
+]
+
+[[package]]
+name = "spade"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "image",
+ "lopdf",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+ "zeroize",
 ]
 
 [[package]]
