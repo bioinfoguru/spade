@@ -1,0 +1,30 @@
+[package]
+name = "desktop-pdf-editor"
+version = "0.1.0"
+description = "Professional Desktop PDF Editor"
+authors = ["PDF Studio Team"]
+edition = "2021"
+
+[lib]
+name = "desktop_pdf_editor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.2", features = [] }
+
+[dependencies]
+tauri = { version = "2.2", features = [] }
+tauri-plugin-dialog = "2.2"
+tauri-plugin-fs = "2.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.43", features = ["full"] }
+lopdf = "0.35"
+zeroize = { version = "1.8", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+thiserror = "2.0"
+uuid = { version = "1.13", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[features]
+default = []
