@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "website:dev": "vite --config website/vite.config.ts",
+    "website:build": "vite build --config website/vite.config.ts",
     "preview": "vite preview",
     "tauri": "tauri"
   },
