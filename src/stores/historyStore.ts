@@ -125,7 +125,7 @@ export const useHistoryStore = defineStore('history', () => {
       case 'transform_image': {
         const item = opStore.imageObjects.find((i) => i.id === op.inversePayload.imageObjectId);
         if (item) {
-          item.rect = op.inversePayload.updates.rect;
+          Object.assign(item, op.inversePayload.updates);
         }
         break;
       }

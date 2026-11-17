@@ -66,6 +66,8 @@ export interface InsertedImageObject {
   imageDataUrl: string;
   rotation: number;
   opacity: number;
+  /** True for images created by Images-to-PDF, used as page thumbnails. */
+  isPageImage?: boolean;
 }
 
 export interface RedactionMark {
@@ -162,8 +164,8 @@ export type DocumentOperation =
       type: "transform_image";
       documentId: string;
       documentRevision: number;
-      payload: { imageObjectId: string; pageIndex: number; updates: { rect: Rect } };
-      inversePayload: { imageObjectId: string; pageIndex: number; updates: { rect: Rect } };
+      payload: { imageObjectId: string; pageIndex: number; updates: Partial<InsertedImageObject> };
+      inversePayload: { imageObjectId: string; pageIndex: number; updates: Partial<InsertedImageObject> };
       timestamp: number;
     }
   | {

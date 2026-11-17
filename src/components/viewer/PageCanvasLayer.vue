@@ -19,15 +19,33 @@ const props = defineProps<{
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let currentRenderTask: RenderTask | null = null;
+let renderSequence = 0;
+
+async function cancelCurrentRender(): Promise<void> {
+  const task = currentRenderTask;
+  if (!task) return;
+
+  currentRenderTask = null;
+  try {
+    task.cancel();
+  } catch {
+    // Ignore tasks that already finished.
+  }
+  try {
+    await task.promise;
+  } catch (err: any) {
+    if (err?.name !== 'RenderingCancelledException') {
+      console.warn('Canvas render cancel error:', err);
+    }
+  }
+}
 
 async function renderCanvas() {
   if (!canvasRef.value || !props.page) return;
 
-  // Cancel any running render task on this canvas before starting a new one
-  if (currentRenderTask) {
-    currentRenderTask.cancel();
-    currentRenderTask = null;
-  }
+  const sequence = ++renderSequence;
+  await cancelCurrentRender();
+  if (sequence !== renderSequence || !canvasRef.value) return;
 
   try {
     const canvas = canvasRef.value;
@@ -54,8 +72,11 @@ async function renderCanvas() {
     });
     currentRenderTask = task;
 
-    await task.promise;
-    currentRenderTask = null;
+    try {
+      await task.promise;
+    } finally {
+      if (currentRenderTask === task) currentRenderTask = null;
+    }
   } catch (err: any) {
     if (err?.name !== 'RenderingCancelledException') {
       console.warn('Canvas render error on page:', err);
@@ -75,6 +96,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  renderSequence += 1;
   if (currentRenderTask) {
     currentRenderTask.cancel();
     currentRenderTask = null;

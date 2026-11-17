@@ -1,7 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "SPADE",
-  "version": "0.1.0",
+  "mainBinaryName": "SPADE",
+  "version": "0.2.0",
   "identifier": "com.pdfstudio.pro",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -13,8 +14,8 @@
     "windows": [
       {
         "title": "SPADE",
-        "width": 1400,
-        "height": 900,
+        "width": 1200,
+        "height": 800,
         "minWidth": 960,
         "minHeight": 640,
         "resizable": true,

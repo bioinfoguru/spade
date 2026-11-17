@@ -3,9 +3,11 @@
     ref="overlayRef"
     class="absolute inset-0 z-[4] overflow-hidden select-none"
     :class="{
-      'cursor-crosshair': ['draw', 'shape', 'highlight', 'text', 'note'].includes(appStore.activeTool),
+      'cursor-crosshair': ['draw', 'shape', 'text', 'note'].includes(appStore.activeTool),
+      'cursor-text': appStore.activeTool === 'highlight',
       'cursor-default': appStore.activeTool === 'select',
-      'cursor-grab': appStore.activeTool === 'hand'
+      'cursor-grab': appStore.activeTool === 'hand',
+      'pointer-events-none': appStore.activeTool === 'highlight'
     }"
     @pointerdown="onPointerDown"
     @pointermove="onPointerMove"
@@ -93,22 +95,23 @@
             stroke-linecap="round"
           />
         </template>
-      </g>
 
-      <!-- Active Highlight In-Progress -->
-      <rect
-        v-if="activeHighlightRect"
-        :x="activeHighlightRect.x"
-        :y="activeHighlightRect.y"
-        :width="activeHighlightRect.width"
-        :height="activeHighlightRect.height"
-        :fill="appStore.strokeColor"
-        :fill-opacity="appStore.highlightOpacity"
-        :stroke="appStore.strokeColor"
-        stroke-width="1"
-        rx="2"
-        style="mix-blend-mode: multiply;"
-      />
+        <!-- Selection outline for removable annotations -->
+        <rect
+          v-if="annot.type !== 'note' && selectedAnnotationId === annot.id && appStore.activeTool === 'select'"
+          :x="toScreenX(annot.rect.x)"
+          :y="toScreenY(annot.rect.y + annot.rect.height)"
+          :width="Math.max(annot.rect.width * scale, 2)"
+          :height="Math.max(annot.rect.height * scale, 2)"
+          rx="2"
+          fill="none"
+          class="text-primary"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-dasharray="4 3"
+          pointer-events="none"
+        />
+      </g>
 
       <!-- Active Drawing In-Progress -->
       <path
@@ -166,8 +169,11 @@
     <div
       v-for="note in pageNotes"
       :key="note.id"
-      class="absolute pointer-events-auto flex flex-col overflow-hidden rounded-sm bg-amber-300 text-amber-950 border border-amber-500/70 shadow-md transition-shadow hover:shadow-lg"
-      :class="{ 'ring-2 ring-primary': appStore.activeTool === 'select' && selectedNoteId === note.id }"
+      class="absolute flex flex-col overflow-hidden rounded-sm bg-amber-300 text-amber-950 border border-amber-500/70 shadow-md transition-shadow hover:shadow-lg"
+      :class="{
+        'ring-2 ring-primary': appStore.activeTool === 'select' && selectedNoteId === note.id,
+        'pointer-events-none': appStore.activeTool !== 'select',
+      }"
       :style="{
         left: `${toScreenX(note.rect.x)}px`,
         top: `${toScreenY(note.rect.y + note.rect.height)}px`,
@@ -205,11 +211,12 @@
     <div
       v-for="textObj in pageTextObjects"
       :key="textObj.id"
-      class="absolute pointer-events-auto group border rounded p-0.5 transition-colors"
+      class="absolute group border rounded p-0.5 transition-colors"
       :class="[
         selectedTextId === textObj.id
           ? 'border-primary ring-1 ring-primary/40'
           : 'border-transparent hover:border-primary/50',
+        appStore.activeTool === 'select' ? 'pointer-events-auto' : 'pointer-events-none',
       ]"
       :style="{
         left: `${toScreenX(textObj.rect.x)}px`,
@@ -252,8 +259,11 @@
     <div
       v-for="img in pageImageObjects"
       :key="img.id"
-      class="absolute pointer-events-auto group border border-transparent hover:border-primary/50 rounded overflow-hidden shadow-xs"
-      :class="{ 'border-primary ring-2 ring-primary/40': appStore.activeTool === 'select' && selectedImageId === img.id }"
+      class="absolute group"
+      :class="{
+        'z-10': isImageSelected(img),
+        'pointer-events-none': appStore.activeTool !== 'select',
+      }"
       :style="{
         left: `${toScreenX(img.rect.x)}px`,
         top: `${toScreenY(img.rect.y + img.rect.height)}px`,
@@ -264,20 +274,99 @@
       }"
       @pointerdown.stop="startImageDrag($event, img)"
     >
-      <img
-        :src="img.imageDataUrl"
-        class="w-full h-full object-contain pointer-events-none"
-        draggable="false"
-      />
-      <button
-        v-if="appStore.activeTool === 'select' && selectedImageId === img.id"
-        class="absolute right-0.5 top-0.5 z-10 rounded bg-destructive p-0.5 text-destructive-foreground shadow-sm hover:bg-destructive/90"
-        title="Delete image"
-        @pointerdown.stop
-        @click.stop="deleteSelectedImage"
+      <div
+        class="h-full w-full overflow-hidden rounded border border-transparent shadow-xs group-hover:border-primary/50"
+        :class="{ 'border-primary ring-2 ring-primary/40': isImageSelected(img) }"
       >
-        <Trash2 class="h-3 w-3" />
-      </button>
+        <img
+          :src="img.imageDataUrl"
+          class="pointer-events-none h-full w-full object-fill"
+          draggable="false"
+        />
+      </div>
+
+      <template v-if="isImageSelected(img) && !isCroppingImage(img)">
+        <!-- Crop image -->
+        <button
+          class="absolute right-6 top-0.5 z-20 rounded bg-card p-0.5 text-foreground shadow-sm ring-1 ring-border hover:bg-muted"
+          title="Crop image"
+          @pointerdown.stop
+          @click.stop="startImageCrop(img)"
+        >
+          <Crop class="h-3 w-3" />
+        </button>
+
+        <!-- Delete image -->
+        <button
+          class="absolute right-0.5 top-0.5 z-20 rounded bg-destructive p-0.5 text-destructive-foreground shadow-sm hover:bg-destructive/90"
+          title="Delete image"
+          @pointerdown.stop
+          @click.stop="deleteSelectedImage"
+        >
+          <Trash2 class="h-3 w-3" />
+        </button>
+
+        <!-- Resize handles -->
+        <div
+          v-for="handle in resizeHandles"
+          :key="`resize-${handle.name}`"
+          class="absolute z-20 h-2.5 w-2.5 rounded-sm border border-primary bg-white shadow-sm"
+          :class="[handle.positionClass, handle.cursorClass]"
+          :title="'Drag to resize'"
+          @pointerdown.stop.prevent="startImageResize($event, img, handle.name)"
+        ></div>
+      </template>
+
+      <!-- Crop session UI -->
+      <div
+        v-if="isCroppingImage(img) && cropSession"
+        class="absolute inset-0 z-30 overflow-hidden"
+        @pointerdown.stop
+      >
+        <div
+          class="absolute cursor-move border-2 border-primary"
+          :style="cropRectStyle"
+          @pointerdown.stop.prevent="startCropDrag($event, 'move')"
+        >
+          <!-- Rule-of-thirds guides -->
+          <div class="pointer-events-none absolute inset-0 opacity-60">
+            <div class="absolute bottom-0 left-1/3 top-0 w-px bg-primary/40"></div>
+            <div class="absolute bottom-0 left-2/3 top-0 w-px bg-primary/40"></div>
+            <div class="absolute left-0 right-0 top-1/3 h-px bg-primary/40"></div>
+            <div class="absolute left-0 right-0 top-2/3 h-px bg-primary/40"></div>
+          </div>
+
+          <div
+            v-for="handle in resizeHandles"
+            :key="`crop-${handle.name}`"
+            class="absolute h-2.5 w-2.5 rounded-sm border border-primary bg-white shadow-sm"
+            :class="[handle.positionClass, handle.cursorClass]"
+            @pointerdown.stop.prevent="startCropDrag($event, handle.name)"
+          ></div>
+
+          <!-- Apply / cancel -->
+          <div
+            class="absolute bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-md border border-border bg-card/95 px-1 py-0.5 shadow-lg backdrop-blur-sm"
+            @pointerdown.stop
+          >
+            <button
+              class="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Cancel crop"
+              @click.stop="cancelImageCrop"
+            >
+              <X class="h-3 w-3" />
+            </button>
+            <button
+              class="flex items-center gap-0.5 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground hover:bg-primary/90"
+              title="Apply crop"
+              @click.stop="applyImageCrop"
+            >
+              <Check class="h-3 w-3" />
+              Apply
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 6. Floating text formatting toolbar -->
@@ -372,6 +461,24 @@
         <Trash2 class="mx-auto w-3 h-3" />
       </button>
     </div>
+
+    <!-- 7. Floating annotation actions -->
+    <div
+      v-if="selectedAnnotation && appStore.activeTool === 'select'"
+      class="absolute z-30 flex items-center gap-1 rounded-md border border-border bg-card px-1.5 py-1 shadow-xl pointer-events-auto"
+      :style="annotationToolbarStyle"
+      @pointerdown.stop
+    >
+      <span class="text-[10px] font-medium text-muted-foreground">{{ selectedAnnotationLabel }}</span>
+      <button
+        class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-destructive transition-colors hover:bg-destructive/10"
+        title="Remove annotation (Delete)"
+        @click="deleteSelectedAnnotation"
+      >
+        <Trash2 class="h-3 w-3" />
+        Remove
+      </button>
+    </div>
   </div>
 </template>
 
@@ -384,6 +491,9 @@ import {
   AlignCenter,
   AlignRight,
   Trash2,
+  Crop,
+  Check,
+  X,
 } from '@lucide/vue';
 import { useAppStore } from '@/stores/appStore';
 import { useOperationStore } from '@/stores/operationStore';
@@ -396,7 +506,6 @@ import {
   AnnotationTransform,
   InkAnnotationData,
   ShapeAnnotationData,
-  HighlightAnnotationData,
   InsertedTextObject,
   InsertedImageObject,
   NoteAnnotationData,
@@ -421,13 +530,24 @@ const overlayRef = ref<HTMLDivElement | null>(null);
 const isInteracting = ref(false);
 const startPoint = ref<Point | null>(null);
 const currentDrawingPoints = ref<Point[]>([]);
-const activeHighlightRect = ref<Rect | null>(null);
 const activeShapeRect = ref<Rect | null>(null);
 const activeShapeEndPoint = ref<Point | null>(null);
 
 const selectedTextId = ref<string | null>(null);
 const selectedNoteId = ref<string | null>(null);
 const selectedImageId = ref<string | null>(null);
+const selectedAnnotationId = ref<string | null>(null);
+
+watch(selectedImageId, (id) => {
+  appStore.selectedImageId = id;
+});
+
+watch(
+  () => appStore.selectedImageId,
+  (id) => {
+    if (id !== selectedImageId.value) selectedImageId.value = id;
+  }
+);
 
 const TEXT_PLACEHOLDER = 'Click to edit text';
 
@@ -458,6 +578,385 @@ interface DragState {
 }
 
 const dragState = ref<DragState | null>(null);
+
+/* ---- Image resizing & cropping ---- */
+
+type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
+
+interface HandleDefinition {
+  name: ResizeHandle;
+  positionClass: string;
+  cursorClass: string;
+}
+
+const resizeHandles: HandleDefinition[] = [
+  { name: 'nw', positionClass: 'left-0 top-0 -translate-x-1/2 -translate-y-1/2', cursorClass: 'cursor-nwse-resize' },
+  { name: 'n', positionClass: 'left-1/2 top-0 -translate-x-1/2 -translate-y-1/2', cursorClass: 'cursor-ns-resize' },
+  { name: 'ne', positionClass: 'right-0 top-0 translate-x-1/2 -translate-y-1/2', cursorClass: 'cursor-nesw-resize' },
+  { name: 'e', positionClass: 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2', cursorClass: 'cursor-ew-resize' },
+  { name: 'se', positionClass: 'bottom-0 right-0 translate-x-1/2 translate-y-1/2', cursorClass: 'cursor-nwse-resize' },
+  { name: 's', positionClass: 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2', cursorClass: 'cursor-ns-resize' },
+  { name: 'sw', positionClass: 'bottom-0 left-0 -translate-x-1/2 translate-y-1/2', cursorClass: 'cursor-nesw-resize' },
+  { name: 'w', positionClass: 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2', cursorClass: 'cursor-ew-resize' },
+];
+
+interface ImageResizeState {
+  id: string;
+  handle: ResizeHandle;
+  startPdf: Point;
+  startRect: Rect;
+  moved: boolean;
+}
+
+const imageResizeState = ref<ImageResizeState | null>(null);
+
+interface CropSession {
+  imageId: string;
+  boxWidth: number;
+  boxHeight: number;
+  draft: Rect;
+}
+
+const cropSession = ref<CropSession | null>(null);
+
+interface CropDragState {
+  mode: 'move' | ResizeHandle;
+  startClientX: number;
+  startClientY: number;
+  startRect: Rect;
+  pointerId: number;
+}
+
+let cropDragState: CropDragState | null = null;
+
+const MIN_IMAGE_PX = 16;
+
+function imageById(id: string | null): InsertedImageObject | null {
+  if (!id) return null;
+  return opStore.imageObjects.find((img) => img.id === id) || null;
+}
+
+function isImageSelected(img: InsertedImageObject): boolean {
+  return appStore.activeTool === 'select' && selectedImageId.value === img.id;
+}
+
+function isCroppingImage(img: InsertedImageObject): boolean {
+  return cropSession.value?.imageId === img.id;
+}
+
+const cropRectStyle = computed(() => {
+  const session = cropSession.value;
+  if (!session) return {};
+  return {
+    left: `${session.draft.x}px`,
+    top: `${session.draft.y}px`,
+    width: `${session.draft.width}px`,
+    height: `${session.draft.height}px`,
+    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.55)',
+  };
+});
+
+function startImageResize(e: PointerEvent, image: InsertedImageObject, handle: ResizeHandle) {
+  if (appStore.activeTool !== 'select') return;
+  selectedImageId.value = image.id;
+  selectedTextId.value = null;
+  selectedNoteId.value = null;
+  selectedAnnotationId.value = null;
+
+  imageResizeState.value = {
+    id: image.id,
+    handle,
+    startPdf: CoordinateConverter.viewportPixelToPdfPoint(
+      getLocalPixelCoords(e),
+      viewport.value
+    ),
+    startRect: cloneRect(image.rect),
+    moved: false,
+  };
+
+  try {
+    overlayRef.value?.setPointerCapture(e.pointerId);
+  } catch {
+    // Pointer capture is best-effort (not supported in every webview)
+  }
+}
+
+function updateImageResize(currentPdf: Point) {
+  const state = imageResizeState.value;
+  if (!state) return;
+
+  const item = imageById(state.id);
+  if (!item) return;
+
+  const dx = currentPdf.x - state.startPdf.x;
+  const dy = currentPdf.y - state.startPdf.y;
+  const start = state.startRect;
+  const minSize = MIN_IMAGE_PX / Math.max(props.scale, 0.01);
+  const handle = state.handle;
+
+  const hasHorizontal = handle.includes('e') || handle.includes('w');
+  const hasVertical = handle.includes('n') || handle.includes('s');
+  const isCorner = hasHorizontal && hasVertical;
+  const useAspectLock = appStore.lockImageAspect && isCorner;
+
+  let x = start.x;
+  let y = start.y;
+  let width = start.width;
+  let height = start.height;
+
+  if (useAspectLock) {
+    const ratio = Math.max(start.height, 0.01) / Math.max(start.width, 0.01);
+    const horizontalDelta = handle.includes('e') ? dx : -dx;
+    const verticalDelta = handle.includes('s') ? dy : -dy;
+
+    // Follow the axis the pointer moved furthest along; the other dimension
+    // is derived so the image never changes shape while the lock is on.
+    if (Math.abs(horizontalDelta) >= Math.abs(verticalDelta)) {
+      width = Math.max(minSize, start.width + horizontalDelta);
+      height = width * ratio;
+    } else {
+      height = Math.max(minSize, start.height + verticalDelta);
+      width = height / ratio;
+    }
+
+    const minWidth = Math.max(minSize, minSize / ratio);
+    const maxWidth = Math.min(props.rawWidth, props.rawHeight / ratio);
+    width = Math.max(minWidth, Math.min(width, maxWidth));
+    height = width * ratio;
+
+    x = handle.includes('w') ? start.x + start.width - width : start.x;
+    y = handle.includes('n') ? start.y + start.height - height : start.y;
+  } else {
+    if (handle.includes('w')) {
+      x = start.x + dx;
+      width = start.width - dx;
+    }
+    if (handle.includes('e')) {
+      width = start.width + dx;
+    }
+    if (handle.includes('n')) {
+      height = start.height + dy;
+    }
+    if (handle.includes('s')) {
+      y = start.y + dy;
+      height = start.height - dy;
+    }
+
+    // Keep a minimum on-screen size without letting the box flip over.
+    if (width < minSize) {
+      width = minSize;
+      if (handle.includes('w')) x = start.x + start.width - minSize;
+    }
+    if (height < minSize) {
+      height = minSize;
+      if (handle.includes('s')) y = start.y + start.height - minSize;
+    }
+
+    width = Math.min(width, props.rawWidth);
+    height = Math.min(height, props.rawHeight);
+  }
+
+  x = Math.max(0, Math.min(x, props.rawWidth - width));
+  y = Math.max(0, Math.min(y, props.rawHeight - height));
+
+  item.rect = { x, y, width, height };
+  state.moved = Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05;
+}
+
+function finishImageResize() {
+  const state = imageResizeState.value;
+  imageResizeState.value = null;
+  if (!state || !state.moved) return;
+
+  const item = imageById(state.id);
+  if (!item) return;
+
+  historyStore.pushOperation({
+    id: `op-${Date.now()}`,
+    type: 'transform_image',
+    documentId: 'doc',
+    documentRevision: opStore.currentRevision + 1,
+    payload: {
+      imageObjectId: item.id,
+      pageIndex: props.pageIndex,
+      updates: { rect: { ...item.rect } },
+    },
+    inversePayload: {
+      imageObjectId: item.id,
+      pageIndex: props.pageIndex,
+      updates: { rect: cloneRect(state.startRect) },
+    },
+    timestamp: Date.now(),
+  });
+}
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Could not load image'));
+    image.src = src;
+  });
+}
+
+function startImageCrop(image: InsertedImageObject) {
+  selectedImageId.value = image.id;
+  const boxWidth = Math.max(1, image.rect.width * props.scale);
+  const boxHeight = Math.max(1, image.rect.height * props.scale);
+
+  cropSession.value = {
+    imageId: image.id,
+    boxWidth,
+    boxHeight,
+    draft: { x: 0, y: 0, width: boxWidth, height: boxHeight },
+  };
+}
+
+function startCropDrag(e: PointerEvent, mode: 'move' | ResizeHandle) {
+  const session = cropSession.value;
+  if (!session) return;
+
+  cropDragState = {
+    mode,
+    startClientX: e.clientX,
+    startClientY: e.clientY,
+    startRect: { ...session.draft },
+    pointerId: e.pointerId,
+  };
+
+  try {
+    overlayRef.value?.setPointerCapture(e.pointerId);
+  } catch {
+    // Pointer capture is best-effort (not supported in every webview)
+  }
+}
+
+function updateCropDrag(e: PointerEvent) {
+  const session = cropSession.value;
+  const drag = cropDragState;
+  if (!session || !drag) return;
+
+  const dx = e.clientX - drag.startClientX;
+  const dy = e.clientY - drag.startClientY;
+  const start = drag.startRect;
+  const min = 12;
+
+  let left = start.x;
+  let top = start.y;
+  let right = start.x + start.width;
+  let bottom = start.y + start.height;
+
+  if (drag.mode === 'move') {
+    left = Math.max(0, Math.min(start.x + dx, session.boxWidth - start.width));
+    top = Math.max(0, Math.min(start.y + dy, session.boxHeight - start.height));
+    right = left + start.width;
+    bottom = top + start.height;
+  } else {
+    if (drag.mode.includes('w')) left = Math.max(0, Math.min(start.x + dx, right - min));
+    if (drag.mode.includes('e')) right = Math.min(session.boxWidth, Math.max(right + dx, left + min));
+    if (drag.mode.includes('n')) top = Math.max(0, Math.min(start.y + dy, bottom - min));
+    if (drag.mode.includes('s')) bottom = Math.min(session.boxHeight, Math.max(bottom + dy, top + min));
+  }
+
+  session.draft = {
+    x: left,
+    y: top,
+    width: Math.max(1, right - left),
+    height: Math.max(1, bottom - top),
+  };
+}
+
+function endCropDrag(e: PointerEvent) {
+  if (!cropDragState) return;
+  if (e.pointerId === cropDragState.pointerId) {
+    try {
+      overlayRef.value?.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignore if capture was never acquired
+    }
+  }
+  cropDragState = null;
+}
+
+function cancelImageCrop() {
+  cropSession.value = null;
+  cropDragState = null;
+}
+
+async function applyImageCrop() {
+  const session = cropSession.value;
+  if (!session) return;
+
+  const item = imageById(session.imageId);
+  if (!item) {
+    cropSession.value = null;
+    return;
+  }
+
+  const fx0 = Math.max(0, Math.min(1, session.draft.x / session.boxWidth));
+  const fy0 = Math.max(0, Math.min(1, session.draft.y / session.boxHeight));
+  const fx1 = Math.max(0, Math.min(1, (session.draft.x + session.draft.width) / session.boxWidth));
+  const fy1 = Math.max(0, Math.min(1, (session.draft.y + session.draft.height) / session.boxHeight));
+
+  if (fx1 - fx0 < 0.01 || fy1 - fy0 < 0.01) {
+    cancelImageCrop();
+    return;
+  }
+
+  const startRect = cloneRect(item.rect);
+  const startDataUrl = item.imageDataUrl;
+
+  try {
+    const imageEl = await loadImageElement(startDataUrl);
+    const naturalWidth = imageEl.naturalWidth || 1;
+    const naturalHeight = imageEl.naturalHeight || 1;
+
+    const sx = Math.round(fx0 * naturalWidth);
+    const sy = Math.round(fy0 * naturalHeight);
+    const sw = Math.max(1, Math.round((fx1 - fx0) * naturalWidth));
+    const sh = Math.max(1, Math.round((fy1 - fy0) * naturalHeight));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not create crop canvas');
+
+    ctx.drawImage(imageEl, sx, sy, sw, sh, 0, 0, sw, sh);
+    const croppedDataUrl = canvas.toDataURL('image/png');
+
+    const newRect: Rect = {
+      x: startRect.x + fx0 * startRect.width,
+      // Draft coordinates are measured from the top, PDF rects from the bottom.
+      y: startRect.y + (1 - fy1) * startRect.height,
+      width: Math.max(1, startRect.width * (fx1 - fx0)),
+      height: Math.max(1, startRect.height * (fy1 - fy0)),
+    };
+
+    cropSession.value = null;
+
+    historyStore.pushOperation({
+      id: `op-${Date.now()}`,
+      type: 'transform_image',
+      documentId: 'doc',
+      documentRevision: opStore.currentRevision + 1,
+      payload: {
+        imageObjectId: item.id,
+        pageIndex: props.pageIndex,
+        updates: { rect: newRect, imageDataUrl: croppedDataUrl },
+      },
+      inversePayload: {
+        imageObjectId: item.id,
+        pageIndex: props.pageIndex,
+        updates: { rect: startRect, imageDataUrl: startDataUrl },
+      },
+      timestamp: Date.now(),
+    });
+  } catch (err) {
+    console.error('Failed to crop image:', err);
+    cancelImageCrop();
+  }
+}
 
 function onNotePointerDown(e: PointerEvent, note: NoteAnnotationData) {
   selectedNoteId.value = note.id;
@@ -517,6 +1016,9 @@ watch(
       selectedTextId.value = null;
       selectedNoteId.value = null;
       selectedImageId.value = null;
+      selectedAnnotationId.value = null;
+      imageResizeState.value = null;
+      cancelImageCrop();
     }
   }
 );
@@ -566,6 +1068,46 @@ const selectedImage = computed(() =>
   ) || null
 );
 
+const selectedAnnotation = computed(() =>
+  opStore.annotations.find(
+    (a) => a.id === selectedAnnotationId.value && a.pageIndex === props.pageIndex
+  ) || null
+);
+
+const selectedAnnotationLabel = computed(() => {
+  switch (selectedAnnotation.value?.type) {
+    case 'highlight':
+      return 'Highlight';
+    case 'ink':
+      return 'Drawing';
+    case 'square':
+    case 'circle':
+    case 'line':
+      return 'Shape';
+    case 'note':
+      return 'Note';
+    default:
+      return 'Annotation';
+  }
+});
+
+const annotationToolbarStyle = computed(() => {
+  if (!selectedAnnotation.value) return {};
+
+  const rect = CoordinateConverter.pdfRectToViewportRect(
+    selectedAnnotation.value.rect,
+    viewport.value
+  );
+  const toolbarWidth = 150;
+  const left = Math.max(4, Math.min(rect.x + rect.width - toolbarWidth, viewport.value.width - toolbarWidth - 4));
+  const top = rect.y > 40 ? rect.y - 34 : rect.y + rect.height + 8;
+
+  return {
+    left: `${left}px`,
+    top: `${Math.max(4, top)}px`,
+  };
+});
+
 const textToolbarStyle = computed(() => {
   if (!selectedText.value) return {};
 
@@ -609,6 +1151,9 @@ function clonePaths(paths: Point[][]): Point[][] {
 
 function onTextBoxPointerDown(e: PointerEvent, textObj: InsertedTextObject) {
   selectedTextId.value = textObj.id;
+  selectedNoteId.value = null;
+  selectedImageId.value = null;
+  selectedAnnotationId.value = null;
 
   // Clicking the box's border/padding should still enter edit mode, which
   // hides the placeholder and places the caret in the textarea.
@@ -671,6 +1216,9 @@ function beginDrag(
 }
 
 function startAnnotationDrag(e: PointerEvent, annot: AnnotationData) {
+  selectedAnnotationId.value = annot.id;
+  selectedImageId.value = null;
+  selectedNoteId.value = annot.type === 'note' ? annot.id : null;
   beginDrag(
     e,
     'annotation',
@@ -682,11 +1230,20 @@ function startAnnotationDrag(e: PointerEvent, annot: AnnotationData) {
 
 function startTextDrag(e: PointerEvent, textObj: InsertedTextObject) {
   selectedTextId.value = textObj.id;
+  selectedNoteId.value = null;
+  selectedImageId.value = null;
+  selectedAnnotationId.value = null;
   beginDrag(e, 'text', textObj.id, textObj.rect);
 }
 
 function startImageDrag(e: PointerEvent, image: InsertedImageObject) {
   selectedImageId.value = image.id;
+  selectedTextId.value = null;
+  selectedNoteId.value = null;
+  selectedAnnotationId.value = null;
+  if (cropSession.value && cropSession.value.imageId !== image.id) {
+    cancelImageCrop();
+  }
   beginDrag(e, 'image', image.id, image.rect);
 }
 
@@ -964,12 +1521,32 @@ function deleteSelectedText() {
   selectedTextId.value = null;
 }
 
+function deleteSelectedAnnotation() {
+  const item = selectedAnnotation.value;
+  if (!item) return;
+
+  historyStore.pushOperation({
+    id: `op-${Date.now()}`,
+    type: 'delete_annotation',
+    documentId: 'doc',
+    documentRevision: opStore.currentRevision + 1,
+    payload: { annotationId: item.id, pageIndex: props.pageIndex },
+    inversePayload: { annotation: item },
+    timestamp: Date.now(),
+  });
+
+  selectedAnnotationId.value = null;
+  selectedNoteId.value = null;
+}
+
 function onPointerDown(e: PointerEvent) {
   if (appStore.activeTool === 'select') {
     commitNoteEdit();
     selectedTextId.value = null;
     selectedNoteId.value = null;
     selectedImageId.value = null;
+    selectedAnnotationId.value = null;
+    cancelImageCrop();
     return;
   }
   if (appStore.activeTool === 'hand') return;
@@ -1055,6 +1632,18 @@ function onPointerDown(e: PointerEvent) {
 }
 
 function onPointerMove(e: PointerEvent) {
+  if (cropDragState) {
+    updateCropDrag(e);
+    return;
+  }
+
+  if (imageResizeState.value) {
+    updateImageResize(
+      CoordinateConverter.viewportPixelToPdfPoint(getLocalPixelCoords(e), viewport.value)
+    );
+    return;
+  }
+
   if (dragState.value) {
     const currentPdf = CoordinateConverter.viewportPixelToPdfPoint(
       getLocalPixelCoords(e),
@@ -1068,14 +1657,7 @@ function onPointerMove(e: PointerEvent) {
 
   const current = getLocalPixelCoords(e);
 
-  if (appStore.activeTool === 'highlight') {
-    activeHighlightRect.value = {
-      x: Math.min(startPoint.value.x, current.x),
-      y: Math.min(startPoint.value.y, current.y),
-      width: Math.abs(current.x - startPoint.value.x),
-      height: Math.abs(current.y - startPoint.value.y),
-    };
-  } else if (appStore.activeTool === 'draw') {
+  if (appStore.activeTool === 'draw') {
     currentDrawingPoints.value.push(current);
   } else if (appStore.activeTool === 'shape') {
     activeShapeRect.value = {
@@ -1088,7 +1670,17 @@ function onPointerMove(e: PointerEvent) {
   }
 }
 
-function onPointerUp(_e: PointerEvent) {
+function onPointerUp(e: PointerEvent) {
+  if (cropDragState) {
+    endCropDrag(e);
+    return;
+  }
+
+  if (imageResizeState.value) {
+    finishImageResize();
+    return;
+  }
+
   if (dragState.value) {
     finishDrag();
     return;
@@ -1096,28 +1688,7 @@ function onPointerUp(_e: PointerEvent) {
 
   if (!isInteracting.value || !startPoint.value) return;
 
-  if (appStore.activeTool === 'highlight' && activeHighlightRect.value && activeHighlightRect.value.width > 3) {
-    const pdfRect = CoordinateConverter.viewportRectToPdfRect(activeHighlightRect.value, viewport.value);
-    const highlightAnnot: HighlightAnnotationData = {
-      id: `highlight-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      pageIndex: props.pageIndex,
-      type: 'highlight',
-      rect: pdfRect,
-      color: appStore.strokeColor || '#facc15',
-      opacity: appStore.highlightOpacity,
-      createdAt: Date.now(),
-    };
-
-    historyStore.pushOperation({
-      id: `op-${Date.now()}`,
-      type: 'add_annotation',
-      documentId: 'doc',
-      documentRevision: opStore.currentRevision + 1,
-      payload: { annotation: highlightAnnot },
-      inversePayload: { annotationId: highlightAnnot.id, pageIndex: props.pageIndex },
-      timestamp: Date.now(),
-    });
-  } else if (appStore.activeTool === 'draw' && currentDrawingPoints.value.length > 1) {
+  if (appStore.activeTool === 'draw' && currentDrawingPoints.value.length > 1) {
     // Convert screen points to PDF User Space points
     const pdfPath = currentDrawingPoints.value.map((p) =>
       CoordinateConverter.viewportPixelToPdfPoint(p, viewport.value)
@@ -1188,7 +1759,6 @@ function onPointerUp(_e: PointerEvent) {
   isInteracting.value = false;
   startPoint.value = null;
   currentDrawingPoints.value = [];
-  activeHighlightRect.value = null;
   activeShapeRect.value = null;
   activeShapeEndPoint.value = null;
 }
@@ -1217,6 +1787,9 @@ function onGlobalKeyDown(e: KeyboardEvent) {
   } else if (selectedText.value) {
     e.preventDefault();
     deleteSelectedText();
+  } else if (selectedAnnotation.value) {
+    e.preventDefault();
+    deleteSelectedAnnotation();
   }
 }
 

@@ -26,6 +26,8 @@ export interface PdfOutlineItem {
 export interface PdfDocumentInfo {
   id: string;
   filePath: string;
+  /** Writable location on disk. Null until the document has been saved (or was opened from disk). */
+  savePath?: string | null;
   fileName: string;
   metadata: PdfMetadata;
   outline: PdfOutlineItem[];

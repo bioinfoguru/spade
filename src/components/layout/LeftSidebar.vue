@@ -98,8 +98,8 @@
               <!-- Thumbnail preview container with Quick Action Overlay -->
               <div class="relative w-full aspect-[1/1.3] bg-background rounded border border-border/50 flex items-center justify-center overflow-hidden shadow-xs">
                 <img
-                  v-if="thumbnails[page.sourceIndex]"
-                  :src="thumbnails[page.sourceIndex]"
+                  v-if="thumbnailSrc(page.sourceIndex)"
+                  :src="thumbnailSrc(page.sourceIndex)"
                   class="w-full h-full object-contain transition-transform duration-200"
                   :style="{
                     transform: `rotate(${opStore.pageRotations[page.id] || 0}deg)`
@@ -280,6 +280,13 @@ const opStore = useOperationStore();
 const historyStore = useHistoryStore();
 
 const thumbnails = ref<Record<number, string>>({});
+
+function thumbnailSrc(sourceIndex: number): string {
+  const pageImage = opStore.imageObjects.find(
+    (image) => image.isPageImage && image.pageIndex === sourceIndex
+  );
+  return pageImage?.imageDataUrl || thumbnails.value[sourceIndex] || '';
+}
 const sidebarScrollRef = ref<HTMLDivElement | null>(null);
 const thumbnailListRef = ref<HTMLElement | null>(null);
 let pageSortable: Sortable | null = null;

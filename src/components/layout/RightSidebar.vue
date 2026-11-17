@@ -93,18 +93,24 @@
       <!-- 2. Shape / Drawing / Highlight Properties -->
       <div v-else-if="['highlight', 'draw', 'shape'].includes(appStore.activeTool)" class="space-y-3">
         <div class="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-          Stroke & Fill
+          {{ appStore.activeTool === 'highlight' ? 'Highlight' : 'Stroke & Fill' }}
         </div>
 
+        <p v-if="appStore.activeTool === 'highlight'" class="text-[11px] leading-relaxed text-muted-foreground">
+          Drag across text on the page to highlight it. To remove any annotation, switch to Select, click it, then click Remove or press Delete.
+        </p>
+
         <div>
-          <label class="block text-[11px] text-muted-foreground mb-1">Stroke Color</label>
+          <label class="block text-[11px] text-muted-foreground mb-1">
+            {{ appStore.activeTool === 'highlight' ? 'Highlight Color' : 'Stroke Color' }}
+          </label>
           <div class="flex items-center space-x-2 bg-background border border-border rounded px-2 py-1">
             <input
-              v-model="appStore.strokeColor"
+              v-model="activeColor"
               type="color"
               class="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
             />
-            <span class="font-mono text-xs text-foreground">{{ appStore.strokeColor }}</span>
+            <span class="font-mono text-xs text-foreground">{{ activeColor }}</span>
           </div>
         </div>
 
@@ -133,7 +139,7 @@
           </div>
         </div>
 
-        <div>
+        <div v-if="appStore.activeTool !== 'highlight'">
           <div class="flex justify-between text-[11px] text-muted-foreground mb-1">
             <span>Stroke Width</span>
             <span>{{ appStore.strokeWidth }}px</span>
@@ -161,6 +167,80 @@
             class="w-full accent-primary"
           />
         </div>
+      </div>
+
+      <!-- Image Properties -->
+      <div
+        v-else-if="appStore.activeTool === 'select' && selectedImage"
+        class="space-y-3 pt-3 border-t border-border"
+      >
+        <div class="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+          Image
+        </div>
+        <p class="text-[11px] leading-relaxed text-muted-foreground">
+          Edit the size and position here, or drag the handles directly on the selected image.
+        </p>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] text-muted-foreground mb-1">Width (pt)</label>
+            <input
+              :value="Math.round(selectedImage.rect.width)"
+              type="number"
+              min="1"
+              step="1"
+              class="w-full bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              @change="onImageFieldChange('width', $event)"
+            />
+          </div>
+          <div>
+            <label class="block text-[11px] text-muted-foreground mb-1">Height (pt)</label>
+            <input
+              :value="Math.round(selectedImage.rect.height)"
+              type="number"
+              min="1"
+              step="1"
+              class="w-full bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              @change="onImageFieldChange('height', $event)"
+            />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[11px] text-muted-foreground mb-1">X (pt)</label>
+            <input
+              :value="Math.round(selectedImage.rect.x)"
+              type="number"
+              step="1"
+              class="w-full bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              @change="onImageFieldChange('x', $event)"
+            />
+          </div>
+          <div>
+            <label class="block text-[11px] text-muted-foreground mb-1">Y (pt)</label>
+            <input
+              :value="Math.round(selectedImage.rect.y)"
+              type="number"
+              step="1"
+              class="w-full bg-background border border-border rounded px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              @change="onImageFieldChange('y', $event)"
+            />
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <input v-model="appStore.lockImageAspect" type="checkbox" class="accent-primary" />
+          Lock aspect ratio when resizing
+        </label>
+
+        <button
+          class="flex w-full items-center justify-center gap-1.5 rounded border border-destructive/40 px-2 py-1 text-[11px] font-medium text-destructive transition-colors hover:bg-destructive/10"
+          @click="deleteSelectedImage"
+        >
+          <Trash2 class="w-3.5 h-3.5" />
+          Delete image
+        </button>
       </div>
 
       <!-- 3. Document Metadata Section -->
@@ -197,12 +277,31 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { PanelRightClose } from '@lucide/vue';
+import { PanelRightClose, Trash2 } from '@lucide/vue';
 import { useAppStore } from '@/stores/appStore';
 import { useDocumentStore } from '@/stores/documentStore';
+import { useOperationStore } from '@/stores/operationStore';
+import { useHistoryStore } from '@/stores/historyStore';
 
 const appStore = useAppStore();
 const docStore = useDocumentStore();
+const opStore = useOperationStore();
+const historyStore = useHistoryStore();
+
+// Highlight color is stored separately from the stroke color used by ink/shapes.
+const activeColor = computed({
+  get: () =>
+    appStore.activeTool === 'highlight'
+      ? appStore.highlightColor
+      : appStore.strokeColor,
+  set: (value: string) => {
+    if (appStore.activeTool === 'highlight') {
+      appStore.highlightColor = value;
+    } else {
+      appStore.strokeColor = value;
+    }
+  },
+});
 
 // Highlights have their own opacity so changing them doesn't affect ink/shapes.
 const activeOpacity = computed({
@@ -218,5 +317,65 @@ const activeOpacity = computed({
     }
   },
 });
+const selectedImage = computed(
+  () => opStore.imageObjects.find((img) => img.id === appStore.selectedImageId) || null
+);
+
+type ImageRectField = 'x' | 'y' | 'width' | 'height';
+
+function onImageFieldChange(field: ImageRectField, event: Event) {
+  const image = selectedImage.value;
+  if (!image) return;
+
+  const input = event.target as HTMLInputElement;
+  const raw = Number(input.value);
+  if (!Number.isFinite(raw)) return;
+
+  const startRect = { ...image.rect };
+  const nextRect = { ...image.rect, [field]: field === 'width' || field === 'height' ? Math.max(1, raw) : raw };
+
+  if (appStore.lockImageAspect && (field === 'width' || field === 'height')) {
+    const ratio = image.rect.height / Math.max(1, image.rect.width);
+    if (field === 'width') nextRect.height = nextRect.width * ratio;
+    else nextRect.width = nextRect.height / ratio;
+  }
+
+  image.rect = nextRect;
+
+  historyStore.pushOperation({
+    id: `op-${Date.now()}`,
+    type: 'transform_image',
+    documentId: 'doc',
+    documentRevision: opStore.currentRevision + 1,
+    payload: {
+      imageObjectId: image.id,
+      pageIndex: image.pageIndex,
+      updates: { rect: { ...nextRect } },
+    },
+    inversePayload: {
+      imageObjectId: image.id,
+      pageIndex: image.pageIndex,
+      updates: { rect: startRect },
+    },
+    timestamp: Date.now(),
+  });
+}
+
+function deleteSelectedImage() {
+  const image = selectedImage.value;
+  if (!image) return;
+
+  historyStore.pushOperation({
+    id: `op-${Date.now()}`,
+    type: 'delete_image',
+    documentId: 'doc',
+    documentRevision: opStore.currentRevision + 1,
+    payload: { imageObjectId: image.id, pageIndex: image.pageIndex },
+    inversePayload: { imageObject: image },
+    timestamp: Date.now(),
+  });
+
+  appStore.selectedImageId = null;
+}
 </script>
 

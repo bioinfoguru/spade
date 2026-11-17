@@ -19,14 +19,8 @@ export interface LoadedPdf {
 }
 
 export class PdfService {
-  /**
-   * Loads a PDF from binary data or file path
-   */
-  static async loadDocument(
-    source: Uint8Array | string,
-    password?: string
-  ): Promise<LoadedPdf> {
-    const loadingTask = pdfjsLib.getDocument({
+  private static createLoadingTask(source: Uint8Array | string, password?: string) {
+    return pdfjsLib.getDocument({
       data: typeof source === 'string' ? undefined : source,
       url: typeof source === 'string' ? source : undefined,
       password: password || undefined,
@@ -36,6 +30,28 @@ export class PdfService {
       wasmUrl: `${PDFJS_CDN}/wasm/`,
       iccUrl: `${PDFJS_CDN}/iccs/`,
     });
+  }
+
+  /**
+   * Loads only the PDF document proxy (no metadata/outline extraction).
+   * Useful for rendering or one-off processing tasks.
+   */
+  static async loadProxy(
+    source: Uint8Array | string,
+    password?: string
+  ): Promise<pdfjsLib.PDFDocumentProxy> {
+    const loadingTask = this.createLoadingTask(source, password);
+    return loadingTask.promise;
+  }
+
+  /**
+   * Loads a PDF from binary data or file path
+   */
+  static async loadDocument(
+    source: Uint8Array | string,
+    password?: string
+  ): Promise<LoadedPdf> {
+    const loadingTask = this.createLoadingTask(source, password);
 
     const pdfDocument = await loadingTask.promise;
     const numPages = pdfDocument.numPages;

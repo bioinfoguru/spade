@@ -2,6 +2,7 @@
   <div
     ref="scrollContainerRef"
     class="flex-1 overflow-auto bg-muted/30 relative flex flex-col items-center p-6 space-y-6"
+    style="scrollbar-gutter: stable"
     @wheel="onWheel"
     @scroll="onScroll"
   >
@@ -69,6 +70,7 @@ const opStore = useOperationStore();
 const scrollContainerRef = ref<HTMLDivElement | null>(null);
 let isProgrammaticScroll = false;
 let scrollTimeout: any = null;
+let fitFrame: number | null = null;
 
 defineEmits<{
   (e: 'open-file'): void;
@@ -213,8 +215,10 @@ function applyFitMode() {
   if (!el || !docStore.currentDoc || viewerStore.fitMode === 'custom') return;
 
   const { width, height } = currentDisplayPageSize();
-  const availableWidth = Math.max(120, el.clientWidth - 48);
-  const availableHeight = Math.max(120, el.clientHeight - 48);
+  // Keep a small buffer inside the padding so scrollbars do not toggle and
+  // feed back into the scale calculation.
+  const availableWidth = Math.max(120, el.clientWidth - 52);
+  const availableHeight = Math.max(120, el.clientHeight - 52);
 
   let nextScale = viewerStore.scale;
   if (viewerStore.fitMode === 'actual') {
@@ -225,7 +229,21 @@ function applyFitMode() {
     nextScale = Math.min(availableWidth / width, availableHeight / height);
   }
 
-  viewerStore.scale = Math.max(0.2, Math.min(5, nextScale));
+  const clamped = Math.max(0.2, Math.min(5, nextScale));
+  if (Math.abs(viewerStore.scale - clamped) > 0.001) {
+    viewerStore.scale = clamped;
+  }
+}
+
+// Fit changes must never run inside a ResizeObserver callback: resizing pages
+// can resize the scroll container again and produce an observer loop. Defer
+// the scale write to the next animation frame and coalesce repeated requests.
+function scheduleFitMode() {
+  if (fitFrame !== null) return;
+  fitFrame = requestAnimationFrame(() => {
+    fitFrame = null;
+    applyFitMode();
+  });
 }
 
 watch(
@@ -237,7 +255,7 @@ watch(
     currentSourceSize,
   ],
   () => {
-    nextTick(applyFitMode);
+    scheduleFitMode();
   },
   { deep: true }
 );
@@ -249,16 +267,23 @@ onMounted(() => {
   if (!scrollContainerRef.value) return;
 
   resizeObserver = new ResizeObserver(() => {
-    applyFitMode();
+    scheduleFitMode();
   });
 
   resizeObserver.observe(scrollContainerRef.value);
-  nextTick(applyFitMode);
+  scheduleFitMode();
 });
 
 onBeforeUnmount(() => {
   if (resizeObserver) {
     resizeObserver.disconnect();
+  }
+  if (fitFrame !== null) {
+    cancelAnimationFrame(fitFrame);
+    fitFrame = null;
+  }
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout);
   }
 });
 </script>

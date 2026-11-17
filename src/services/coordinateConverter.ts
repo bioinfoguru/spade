@@ -149,7 +149,8 @@ export class CoordinateConverter {
 
   /**
    * Configures HTML5 Canvas resolution for High-DPI displays.
-   * DPR applies exclusively to the backing buffer, keeping CSS layout independent.
+   * DPR is applied only to the backing buffer; callers render with a viewport
+   * already scaled by DPR, so the 2D context must stay at its default scale.
    */
   static setupCanvasResolution(
     canvas: HTMLCanvasElement,
@@ -168,7 +169,6 @@ export class CoordinateConverter {
       throw new Error('Failed to acquire 2D canvas context');
     }
 
-    ctx.scale(dpr, dpr);
     return ctx;
   }
 }

@@ -33,8 +33,11 @@
       <PageTextLayer
         v-if="pageProxy"
         :page="pageProxy"
+        :page-index="pageIndex"
         :scale="effectiveScale"
         :rotation="effectiveRotation"
+        :raw-width="rawWidth"
+        :raw-height="rawHeight"
       />
 
       <!-- Layer 3: AcroForms & Interactive Links -->

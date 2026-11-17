@@ -18,13 +18,18 @@ export const useAppStore = defineStore('app', () => {
   const fillColor = ref('#93c5fd');
   const strokeWidth = ref(2);
   const opacity = ref(1.0);
-  const highlightOpacity = ref(0.5);
+  const highlightColor = ref('#facc15');
+  const highlightOpacity = ref(0.4);
   const fontSize = ref(14);
   const fontFamily = ref('Inter, sans-serif');
   const textColor = ref('#111827');
   const isBold = ref(false);
   const isItalic = ref(false);
   const textAlign = ref<'left' | 'center' | 'right'>('left');
+
+  // Shared selection state so the properties panel can edit the active image.
+  const selectedImageId = ref<string | null>(null);
+  const lockImageAspect = ref(true);
 
   function toggleTheme() {
     isDark.value = !isDark.value;
@@ -50,6 +55,7 @@ export const useAppStore = defineStore('app', () => {
     fillColor,
     strokeWidth,
     opacity,
+    highlightColor,
     highlightOpacity,
     fontSize,
     fontFamily,
@@ -57,6 +63,8 @@ export const useAppStore = defineStore('app', () => {
     isBold,
     isItalic,
     textAlign,
+    selectedImageId,
+    lockImageAspect,
     toggleTheme,
     setTool,
   };

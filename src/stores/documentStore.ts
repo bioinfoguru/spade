@@ -28,6 +28,25 @@ export const useDocumentStore = defineStore('document', () => {
     }
   }
 
+  /**
+   * Records a successful save. Passing the destination path turns future
+   * quick-saves into in-place writes instead of prompting for a location.
+   */
+  function markSaved(destination?: string | null) {
+    const doc = currentDoc.value;
+    if (!doc) return;
+
+    doc.isDirty = false;
+    doc.lastSavedAt = Date.now();
+
+    if (destination) {
+      doc.savePath = destination;
+      doc.filePath = destination;
+      const name = destination.split(/[\\/]/).pop();
+      if (name) doc.fileName = name;
+    }
+  }
+
   function closeDocument(docId: string) {
     const idx = openDocs.value.findIndex((d) => d.id === docId);
     if (idx !== -1) {
@@ -47,6 +66,7 @@ export const useDocumentStore = defineStore('document', () => {
     loadingProgress,
     setCurrentDoc,
     markDirty,
+    markSaved,
     closeDocument,
   };
 });

@@ -118,7 +118,7 @@ export const useOperationStore = defineStore('operations', () => {
       case 'transform_image': {
         const item = imageObjects.value.find((img) => img.id === op.payload.imageObjectId);
         if (item) {
-          item.rect = op.payload.updates.rect;
+          Object.assign(item, op.payload.updates);
         }
         break;
       }

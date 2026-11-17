@@ -42,7 +42,7 @@
               ? 'bg-primary text-primary-foreground shadow-sm'
               : 'text-foreground hover:bg-muted'
           ]"
-          title="Highlight Text (Drag to highlight)"
+          title="Highlight Text (Select text to highlight)"
         >
           <Highlighter class="w-3.5 h-3.5 text-amber-500" />
           <span class="hidden lg:inline">Highlight</span>

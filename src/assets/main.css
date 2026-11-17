@@ -101,6 +101,20 @@
   color: transparent;
 }
 
+/*
+ * While the highlight tool is active the text layer becomes the interaction
+ * surface: it stays fully opaque (the glyphs themselves are transparent) so
+ * the native selection colour is clearly visible, and it must not be blocked
+ * by the editor overlay.
+ */
+.textLayer.textLayer--markup {
+  opacity: 1;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  pointer-events: auto;
+  cursor: text;
+}
+
 /* PDF annotation layer */
 .annotationLayer {
   position: absolute;
