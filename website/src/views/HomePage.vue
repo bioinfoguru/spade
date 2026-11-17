@@ -110,7 +110,7 @@
               <span class="download-file-icon"><FileDown :size="18" /></span>
               <span class="download-file-copy">
                 <strong>{{ option.title }}</strong>
-                <small>{{ option.description }} <span class="asset-name">{{ option.asset.name }}</span></small>
+                <small>{{ option.description }} <span class="asset-name">{{ option.asset.name }}</span><span v-if="formatAssetSize(option.asset.size)" class="asset-size"> · {{ formatAssetSize(option.asset.size) }}</span></small>
               </span>
               <span class="download-cta">Download <ArrowDownToLine :size="15" /></span>
             </a>
@@ -145,6 +145,7 @@ import {
 type PlatformId = 'windows' | 'macos' | 'linux';
 interface ReleaseAsset {
   name: string;
+  size: number;
   browser_download_url: string;
 }
 interface GitHubRelease {
@@ -174,6 +175,22 @@ const releaseLoading = ref(true);
 const releaseError = ref(false);
 
 const activePlatformInfo = computed(() => platforms.find((item) => item.id === activePlatform.value) ?? platforms[0]);
+
+function formatAssetSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const digits = unitIndex === 0 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(digits)} ${units[unitIndex]}`;
+}
 
 function findAsset(pattern: RegExp): ReleaseAsset | undefined {
   return release.value?.assets.find((asset) => pattern.test(asset.name));

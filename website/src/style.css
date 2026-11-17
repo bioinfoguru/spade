@@ -122,6 +122,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .download-file-copy strong { color: #e2ecf8; font-size: 12px; }
 .download-file-copy small { overflow: hidden; color: #8395aa; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .asset-name { margin-left: 5px; color: #657992; font-family: var(--mono); font-size: 9px; }
+.asset-size { color: #a9bece; font-family: var(--mono); font-weight: 700; white-space: nowrap; }
 .download-cta { display: inline-flex; align-items: center; gap: 7px; color: var(--mint); font-size: 10px; font-weight: 800; white-space: nowrap; }
 .download-empty { display: flex; min-height: 72px; align-items: center; justify-content: center; gap: 10px; border: 1px dashed rgba(162,188,218,.16); border-radius: 10px; color: #8da0b5; font-size: 11px; text-align: center; }
 .loading-spinner { width: 14px; height: 14px; border: 2px solid rgba(156,81,224,.25); border-top-color: var(--mint); border-radius: 50%; animation: spin .8s linear infinite; }
@@ -229,6 +230,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .download-file-copy strong { font-size: 14px; }
 .download-file-copy small { font-size: 12px; }
 .asset-name { font-size: 11px; }
+.asset-size { font-size: 11px; }
 .download-cta { font-size: 12px; }
 .download-empty { font-size: 13px; }
 .contact-heading p { font-size: 16px; }
