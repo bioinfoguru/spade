@@ -15,5 +15,6 @@ spade_github_sync.pub
 spade_github_ed25519
 spade_github_ed25519.pub
 
-# Local sync helper (keep a copy on this machine, not in the repository)
+# Local sync helpers (keep copies on this machine, not in the repository)
 sync-to-github.bat
+cleanup-github-storage.bat

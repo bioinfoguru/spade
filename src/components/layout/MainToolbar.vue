@@ -176,8 +176,18 @@
 
     </div>
 
-    <!-- Right Section: Panel Toggle -->
+    <!-- Right Section: Panel Toggles -->
     <div class="flex items-center space-x-1">
+      <button
+        @click="toggleLeftPanel"
+        :class="[
+          'p-1.5 rounded transition-colors',
+          appStore.leftSidebarOpen ? 'bg-secondary text-primary' : 'text-foreground hover:bg-muted'
+        ]"
+        title="Toggle Pages Panel"
+      >
+        <PanelLeft class="w-3.5 h-3.5" />
+      </button>
       <button
         @click="toggleRightPanel"
         :class="[
@@ -208,6 +218,7 @@ import {
   Crop,
   Trash2,
   SlidersHorizontal,
+  PanelLeft,
 } from '@lucide/vue';
 import { confirm as tauriConfirm } from '@tauri-apps/plugin-dialog';
 import { useAppStore } from '@/stores/appStore';
@@ -225,6 +236,10 @@ const historyStore = useHistoryStore();
 defineEmits<{
   (e: 'add-image'): void;
 }>();
+
+function toggleLeftPanel() {
+  appStore.leftSidebarOpen = !appStore.leftSidebarOpen;
+}
 
 function toggleRightPanel() {
   appStore.rightSidebarOpen = !appStore.rightSidebarOpen;
