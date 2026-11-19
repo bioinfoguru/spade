@@ -16,6 +16,7 @@
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-fs": "^2.7.1",
+    "@tauri-apps/plugin-opener": "^2.7.3",
     "@vue/devtools-api": "^8.2.1",
     "clsx": "^2.1.1",
     "pdf-lib": "^1.17.1",
