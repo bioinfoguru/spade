@@ -84,8 +84,7 @@
           <a
             v-if="updateStore.updateAvailable && updateStore.releasePageUrl"
             :href="updateStore.releasePageUrl"
-            target="_blank"
-            rel="noopener noreferrer"
+            @click.prevent="openReleasePage"
             class="inline-flex items-center gap-1.5 mt-2 text-primary hover:underline font-medium"
           >
             View release {{ updateStore.latestVersion }} on GitHub
@@ -103,9 +102,16 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ArrowLeft, FolderOpen, Layers, Pencil, Images, Keyboard, RefreshCw, ExternalLink } from '@lucide/vue';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { useUpdateStore } from '@/stores/updateStore';
 
 const updateStore = useUpdateStore();
+
+async function openReleasePage() {
+  if (updateStore.releasePageUrl) {
+    await openUrl(updateStore.releasePageUrl);
+  }
+}
 
 const lastCheckedLabel = computed(() => {
   if (!updateStore.lastCheckedAt) return '';

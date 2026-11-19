@@ -2,6 +2,19 @@
   <div class="h-10 bg-card border-b border-border flex items-center justify-between px-3 text-xs select-none z-20 shrink-0">
     <!-- Left Section: Tool Selection -->
     <div class="flex items-center space-x-1 overflow-x-auto">
+      <button
+        @click="toggleLeftPanel"
+        :class="[
+          'p-1.5 rounded transition-colors',
+          appStore.leftSidebarOpen ? 'bg-secondary text-primary' : 'text-foreground hover:bg-muted'
+        ]"
+        title="Toggle Pages Panel"
+      >
+        <PanelLeft class="w-3.5 h-3.5" />
+      </button>
+
+      <div class="h-4 w-px bg-border/60 mx-1"></div>
+
       <!-- Select / Hand Group -->
       <div class="flex items-center space-x-0.5 bg-secondary/50 p-0.5 rounded-md border border-border/50">
         <button
@@ -178,16 +191,6 @@
 
     <!-- Right Section: Panel Toggles -->
     <div class="flex items-center space-x-1">
-      <button
-        @click="toggleLeftPanel"
-        :class="[
-          'p-1.5 rounded transition-colors',
-          appStore.leftSidebarOpen ? 'bg-secondary text-primary' : 'text-foreground hover:bg-muted'
-        ]"
-        title="Toggle Pages Panel"
-      >
-        <PanelLeft class="w-3.5 h-3.5" />
-      </button>
       <button
         @click="toggleRightPanel"
         :class="[

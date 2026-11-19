@@ -2,7 +2,7 @@
 name = "spade"
 version = "0.1.0"
 description = "Professional Desktop PDF Editor"
-authors = ["PDF Studio Team"]
+authors = ["bioinfo.guru"]
 edition = "2021"
 
 [lib]
@@ -16,6 +16,7 @@ tauri-build = { version = "2.2", features = [] }
 tauri = { version = "2.2", features = [] }
 tauri-plugin-dialog = "2.2"
 tauri-plugin-fs = "2.2"
+tauri-plugin-opener = "2.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.43", features = ["full"] }
